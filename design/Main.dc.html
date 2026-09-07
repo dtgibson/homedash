@@ -1,0 +1,268 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=Newsreader:opsz,wght@6..72,300;6..72,400&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: oklch(0.93 0.007 85); text-decoration: none; }
+    a:hover { color: oklch(0.84 0.125 78); }
+    ::selection { background: oklch(0.78 0.125 78 / 0.28); }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; padding: 44px 52px 40px; display: flex; flex-direction: column; gap: 26px; color: oklch(0.95 0.007 85); background: radial-gradient(680px 320px at 8% -8%, oklch(0.78 0.125 78 / 0.10), transparent 70%), radial-gradient(560px 300px at 96% -6%, oklch(0.72 0.115 152 / 0.055), transparent 72%), oklch(0.155 0.006 70);">
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px;">
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <h1 style="margin: 0; font-family: Newsreader, Georgia, 'Times New Roman', serif; font-weight: 300; font-size: 50px; line-height: 1; letter-spacing: -0.015em; text-wrap: pretty; color: oklch(0.96 0.007 85);">Good morning, Dave.</h1>
+      <p style="margin: 0; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.17em; text-transform: uppercase; color: oklch(0.58 0.010 78);">Monday, September 7 &middot; 2026</p>
+    </div>
+    <div style="display: flex; align-items: center; gap: 26px;">
+      <div style="display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: oklch(0.235 0.009 68); border: 1px solid oklch(0.30 0.010 68);">
+        <span style="padding: 7px 13px; border-radius: 7px; background: oklch(0.305 0.012 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: oklch(0.93 0.007 85);">Rich</span>
+        <span style="padding: 7px 13px; border-radius: 7px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: oklch(0.55 0.010 78);">Text</span>
+      </div>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 9px;">
+      <svg width="260" height="76" viewBox="0 0 260 76" fill="none" aria-hidden="true">
+        <path d="M8 68 Q130 -6 252 68" stroke="oklch(0.33 0.010 70)" stroke-width="1.25" stroke-linecap="round" stroke-dasharray="3 5"></path>
+        <path d="M8 68 Q17.76 62.08 27.5 57.1" stroke="oklch(0.78 0.125 78)" stroke-width="1.7" stroke-linecap="round"></path>
+        <circle cx="27.5" cy="57.1" r="9.5" fill="oklch(0.78 0.125 78 / 0.16)"></circle>
+        <circle cx="27.5" cy="57.1" r="3.6" fill="oklch(0.84 0.125 78)"></circle>
+        <line x1="8" y1="71" x2="252" y2="71" stroke="oklch(0.28 0.009 70)" stroke-width="1"></line>
+      </svg>
+      <div style="display: flex; gap: 24px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; letter-spacing: 0.11em; color: oklch(0.55 0.010 78); font-variant-numeric: tabular-nums;">
+        <span>SUNRISE 6:46</span>
+        <span>SUNSET 19:35</span>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px;">
+
+    <div style="box-sizing: border-box; background: oklch(0.205 0.008 68); border: 1px solid oklch(0.275 0.009 68); border-radius: 14px; padding: 22px 22px 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 0; gap: 16px;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: oklch(0.58 0.010 78);">Weather</span>
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; letter-spacing: 0.05em; color: oklch(0.52 0.010 78);">San Francisco, CA</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 18px;">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="8.4" cy="8.2" r="3.1" stroke="oklch(0.80 0.125 78)"></circle>
+          <path d="M8.4 1.9v1.5M2.1 8.2h1.5M3.95 3.75l1.05 1.05M12.85 3.75l-1.05 1.05M4.6 12.35l-.65.65" stroke="oklch(0.80 0.125 78)"></path>
+          <path d="M17.6 20.6H8.4a3.6 3.6 0 1 1 .6-7.2 5 5 0 0 1 9.3 1.3 3 3 0 0 1-.7 5.9z" stroke="oklch(0.70 0.010 80)"></path>
+        </svg>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 58px; line-height: 0.9; letter-spacing: -0.02em; color: oklch(0.96 0.007 85); font-variant-numeric: tabular-nums;">58&deg;</span>
+          <span style="font-size: 14px; color: oklch(0.74 0.010 80);">Low clouds clearing</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 18px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: oklch(0.70 0.010 80);">
+        <span>H 72&deg;</span>
+        <span style="color: oklch(0.55 0.010 78);">L 56&deg;</span>
+        <span style="color: oklch(0.55 0.010 78);">Wind 8 NW</span>
+      </div>
+      <div style="flex: none; height: 1px; background: oklch(0.27 0.009 68);"></div>
+      <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: 0.06em; color: oklch(0.52 0.010 78);">8 AM</span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.66 0.010 80)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.6 18.6H7.4a3.9 3.9 0 1 1 .6-7.8 5.3 5.3 0 0 1 9.9 1.4 3.2 3.2 0 0 1-.3 6.4z"></path></svg>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 500; color: oklch(0.88 0.007 85); font-variant-numeric: tabular-nums;">58&deg;</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: 0.06em; color: oklch(0.52 0.010 78);">10 AM</span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.66 0.010 80)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.6 18.6H7.4a3.9 3.9 0 1 1 .6-7.8 5.3 5.3 0 0 1 9.9 1.4 3.2 3.2 0 0 1-.3 6.4z"></path></svg>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 500; color: oklch(0.88 0.007 85); font-variant-numeric: tabular-nums;">63&deg;</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: 0.06em; color: oklch(0.52 0.010 78);">NOON</span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.80 0.125 78)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"></path></svg>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 500; color: oklch(0.88 0.007 85); font-variant-numeric: tabular-nums;">68&deg;</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: 0.06em; color: oklch(0.52 0.010 78);">2 PM</span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.80 0.125 78)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"></path></svg>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 500; color: oklch(0.88 0.007 85); font-variant-numeric: tabular-nums;">72&deg;</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 7px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: 0.06em; color: oklch(0.52 0.010 78);">4 PM</span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.80 0.125 78)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"></path></svg>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 500; color: oklch(0.88 0.007 85); font-variant-numeric: tabular-nums;">70&deg;</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="box-sizing: border-box; background: oklch(0.205 0.008 68); border: 1px solid oklch(0.275 0.009 68); border-radius: 14px; padding: 22px 22px 20px; display: flex; flex-direction: column; min-height: 0; gap: 15px;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: oklch(0.58 0.010 78);">eBird</span>
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; letter-spacing: 0.05em; color: oklch(0.52 0.010 78);">Year list &middot; 2026</span>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <span style="font-family: Newsreader, Georgia, serif; font-weight: 300; font-size: 52px; line-height: 0.9; letter-spacing: -0.02em; color: oklch(0.78 0.115 152); font-variant-numeric: tabular-nums;">284</span>
+        <span style="font-size: 13.5px; color: oklch(0.68 0.010 80);">species</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 17px; font-weight: 500; color: oklch(0.92 0.007 85); font-variant-numeric: tabular-nums;">612</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.53 0.010 78);">Life list</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 17px; font-weight: 500; color: oklch(0.92 0.007 85); font-variant-numeric: tabular-nums;">197</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.53 0.010 78);">Checklists</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 17px; font-weight: 500; color: oklch(0.92 0.007 85); font-variant-numeric: tabular-nums;">94</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.53 0.010 78);">This month</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <svg width="100%" height="52" viewBox="0 0 378 52" preserveAspectRatio="none" fill="none" aria-hidden="true">
+          <polyline points="0,41.1 47.25,42 94.5,34.5 141.75,16.2 189,4 236.25,26.3 283.5,33.9 330.75,35.9" stroke="oklch(0.74 0.115 152)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          <line x1="330.75" y1="35.9" x2="378" y2="31.6" stroke="oklch(0.74 0.115 152)" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="3 4"></line>
+          <circle cx="378" cy="31.6" r="3" fill="oklch(0.205 0.008 68)" stroke="oklch(0.80 0.115 152)" stroke-width="1.6"></circle>
+        </svg>
+        <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; letter-spacing: 0.1em; color: oklch(0.48 0.010 78);">
+          <span>JAN</span>
+          <span>SEP &middot; 7 DAYS</span>
+        </div>
+      </div>
+      <div style="flex: none; height: 1px; background: oklch(0.27 0.009 68);"></div>
+      <div style="display: flex; flex-direction: column; gap: 9px;">
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; color: oklch(0.53 0.010 78);">Notable nearby</span>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+          <span style="font-size: 13px; color: oklch(0.80 0.115 152);">Baird&#39;s Sandpiper</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; color: oklch(0.50 0.010 78); white-space: nowrap;">Hayward Shoreline &middot; 2h</span>
+        </div>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+          <span style="font-size: 13px; color: oklch(0.80 0.115 152);">American Redstart</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10px; color: oklch(0.50 0.010 78); white-space: nowrap;">Golden Gate Park &middot; 5h</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="box-sizing: border-box; background: oklch(0.205 0.008 68); border: 1px solid oklch(0.275 0.009 68); border-radius: 14px; padding: 22px 22px 20px; display: flex; flex-direction: column; min-height: 0; gap: 15px;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: oklch(0.58 0.010 78);">llmdash</span>
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; letter-spacing: 0.05em; color: oklch(0.52 0.010 78);">localhost:8787</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: oklch(0.70 0.125 42);"></span>
+          <span style="font-size: 13.5px; font-weight: 500; color: oklch(0.92 0.007 85);">Claude Code</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.50 0.010 78);">Max</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11px; font-variant-numeric: tabular-nums;">
+            <span style="color: oklch(0.66 0.010 80);">5-hour</span>
+            <span style="color: oklch(0.90 0.007 85); font-weight: 500;">68% &middot; resets 1h 47m</span>
+          </div>
+          <div style="height: 5px; border-radius: 3px; background: oklch(0.27 0.009 68); overflow: hidden;">
+            <div style="width: 68%; height: 100%; border-radius: 3px; background: oklch(0.70 0.125 42);"></div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11px; font-variant-numeric: tabular-nums;">
+            <span style="color: oklch(0.66 0.010 80);">Weekly</span>
+            <span style="color: oklch(0.90 0.007 85); font-weight: 500;">41% &middot; resets Thu</span>
+          </div>
+          <div style="height: 5px; border-radius: 3px; background: oklch(0.27 0.009 68); overflow: hidden;">
+            <div style="width: 41%; height: 100%; border-radius: 3px; background: oklch(0.70 0.125 42 / 0.62);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: oklch(0.73 0.105 252);"></span>
+          <span style="font-size: 13.5px; font-weight: 500; color: oklch(0.92 0.007 85);">Codex</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11px; font-variant-numeric: tabular-nums;">
+            <span style="color: oklch(0.66 0.010 80);">5-hour</span>
+            <span style="color: oklch(0.90 0.007 85); font-weight: 500;">22% &middot; resets 3h 12m</span>
+          </div>
+          <div style="height: 5px; border-radius: 3px; background: oklch(0.27 0.009 68); overflow: hidden;">
+            <div style="width: 22%; height: 100%; border-radius: 3px; background: oklch(0.73 0.105 252);"></div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11px; font-variant-numeric: tabular-nums;">
+            <span style="color: oklch(0.66 0.010 80);">Weekly</span>
+            <span style="color: oklch(0.90 0.007 85); font-weight: 500;">63% &middot; resets Sat</span>
+          </div>
+          <div style="height: 5px; border-radius: 3px; background: oklch(0.27 0.009 68); overflow: hidden;">
+            <div style="width: 63%; height: 100%; border-radius: 3px; background: oklch(0.73 0.105 252 / 0.62);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex: none; height: 1px; background: oklch(0.27 0.009 68);"></div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 15px; font-weight: 500; color: oklch(0.92 0.007 85); font-variant-numeric: tabular-nums;">4.82M</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.53 0.010 78);">Tokens today</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 15px; font-weight: 500; color: oklch(0.92 0.007 85); font-variant-numeric: tabular-nums;">11</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.53 0.010 78);">Sessions</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 15px; font-weight: 500; color: oklch(0.92 0.007 85); font-variant-numeric: tabular-nums;">87%</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.53 0.010 78);">Cache hit</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px; padding: 8px 11px; border-radius: 8px; background: oklch(0.73 0.105 252 / 0.10); border: 1px solid oklch(0.73 0.105 252 / 0.22);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.76 0.105 252)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"></path></svg>
+        <span style="font-size: 12.5px; color: oklch(0.80 0.075 252);">Codex has the 5-hour room &middot; Claude the weekly</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0;">
+    <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: oklch(0.58 0.010 78);">Bookmarks</span>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px;">
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="padding-bottom: 8px; border-bottom: 1px solid oklch(0.27 0.009 68);"><span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; color: oklch(0.51 0.010 78);">Daily</span></div>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">Gm</span><span style="font-size: 14px; font-weight: 500;">Gmail</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">Ca</span><span style="font-size: 14px; font-weight: 500;">Calendar</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">GH</span><span style="font-size: 14px; font-weight: 500;">GitHub</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.70 0.125 42 / 0.16); border: 1px solid oklch(0.70 0.125 42 / 0.34); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.76 0.125 42);">Cl</span><span style="font-size: 14px; font-weight: 500;">Claude</span></a>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="padding-bottom: 8px; border-bottom: 1px solid oklch(0.27 0.009 68);"><span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; color: oklch(0.51 0.010 78);">Projects</span></div>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.73 0.105 252 / 0.15); border: 1px solid oklch(0.73 0.105 252 / 0.32); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.78 0.105 252);">ld</span><span style="font-size: 14px; font-weight: 500;">llmdash</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.72 0.115 152 / 0.15); border: 1px solid oklch(0.72 0.115 152 / 0.32); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.78 0.115 152);">SR</span><span style="font-size: 14px; font-weight: 500;">SnowRaven</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">mt</span><span style="font-size: 14px; font-weight: 500;">marktodo</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">dg</span><span style="font-size: 14px; font-weight: 500;">dtgibson.com</span></a>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="padding-bottom: 8px; border-bottom: 1px solid oklch(0.27 0.009 68);"><span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; color: oklch(0.51 0.010 78);">Birding</span></div>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.72 0.115 152 / 0.15); border: 1px solid oklch(0.72 0.115 152 / 0.32); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.78 0.115 152);">eB</span><span style="font-size: 14px; font-weight: 500;">eBird</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">Me</span><span style="font-size: 14px; font-weight: 500;">Merlin</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">BC</span><span style="font-size: 14px; font-weight: 500;">BirdCast</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">ML</span><span style="font-size: 14px; font-weight: 500;">Macaulay Library</span></a>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="padding-bottom: 8px; border-bottom: 1px solid oklch(0.27 0.009 68);"><span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase; color: oklch(0.51 0.010 78);">Reference</span></div>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">MD</span><span style="font-size: 14px; font-weight: 500;">MDN</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">No</span><span style="font-size: 14px; font-weight: 500;">Node.js Docs</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">Ts</span><span style="font-size: 14px; font-weight: 500;">Tailscale</span></a>
+        <a href="#" style="display: flex; align-items: center; gap: 11px; height: 44px;"><span aria-hidden="true" style="flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: oklch(0.245 0.010 68); border: 1px solid oklch(0.30 0.010 68); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 600; color: oklch(0.72 0.010 80);">An</span><span style="font-size: 14px; font-weight: 500;">Anthropic Docs</span></a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

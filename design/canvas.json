@@ -1,0 +1,38 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Rich mode — Dawn" },
+    { "file": "DenseDark.dc.html", "x": 0, "y": 1020, "w": 820, "h": 620, "title": "Text mode — dark ground" },
+    { "file": "DenseLight.dc.html", "x": 900, "y": 1020, "w": 820, "h": 620, "title": "Text mode — light ground" }
+  ],
+  "annotations": [
+    {
+      "id": "rich-mode",
+      "x": 1520,
+      "y": 0,
+      "w": 300,
+      "text": "RICH MODE — \"DAWN\"\n\nWarm dark ground, editorial serif for the human parts, mono for every figure. The sun arc tracks the real day. Green is eBird, terracotta and blue are Claude and Codex — borrowed from llmdash's own dark theme so the two apps read as siblings.\n\nSwitcher sits top right, beside the arc.\n\nFixed since the first pass: the bookmarks block no longer overruns the frame (the card row sizes to its content instead of a hard 380px), the weather card distributes its slack so the row has a level bottom edge, and the hairline rules can no longer collapse under pressure."
+    },
+    {
+      "id": "data-note",
+      "x": 1520,
+      "y": 430,
+      "w": 300,
+      "text": "DATA HONESTY — FIXED\n\nThe eBird sparkline was an area chart closing to a zero baseline, which made its May peak imply ~221 species in a month against a 284 year list. Now a line, no implied baseline.\n\nSeptember is 7 days old, so its segment is dashed and its dot hollow — it no longer reads as a settled month.\n\nRed-necked Phalarope came off the rare list: it is expected in the thousands at Alviso in September. Pull this from eBird's notable endpoint, never a hand-kept list.\n\nThe headroom line now names both windows — Codex has the 5-hour room, Claude the weekly. The old copy was true on one horizon and false on the other."
+    },
+    {
+      "id": "dense-note",
+      "x": 0,
+      "y": 1700,
+      "w": 340,
+      "text": "TEXT MODE — now a spec, not a sketch\n\nSame four widgets, no cards: a label column and rows of values, everything visible at once. All mono, one family.\n\nIt shows MORE than rich mode, not less — seven hourly readings instead of five, both reset countdowns with meters, 21 bookmarks. Density is the point of the mode.\n\nNote it needs 820×620 to say what rich mode needs 1440×900 for.\n\nKnown tradeoff, carried over deliberately: 24px link rows are below a comfortable touch target. If a phone ends up on text mode, the rows want to grow at narrow widths."
+    },
+    {
+      "id": "ground-note",
+      "x": 900,
+      "y": 1700,
+      "w": 340,
+      "text": "THE QUESTION ON THE TABLE\n\nIdentical markup, two palettes — pick one and the other is a single deletion.\n\nDARK (left) keeps density as the only thing the switcher changes, so light/dark stays a separate axis you can add later on either mode.\n\nLIGHT (right) is the day page to Dawn's night page. Reads better in a bright room, but it welds ground colour to density: choosing text mode would also mean choosing light.\n\nWorth deciding by eye now, because it sets whether the build needs one theme axis or two."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}
