@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Public bootstrap for first installs and later updates:
-#   curl -fsSL HOMEDASH_INSTALL_URL | bash
+#   curl -fsSL https://gist.githubusercontent.com/dtgibson/7412cd394fc0088904f83de72fcf2850/raw/bootstrap.sh | bash
 
 set -Eeuo pipefail
 
