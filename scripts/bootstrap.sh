@@ -14,14 +14,20 @@ fail() {
 
 command -v git >/dev/null 2>&1 || fail "git is required."
 
+install_checkout() {
+  printf 'Installing homedash at %s…\n' "$HOMEDASH_DIR"
+  git clone --depth 1 "$HOMEDASH_REPO" "$HOMEDASH_DIR"
+}
+
 if [[ -d "$HOMEDASH_DIR/.git" ]]; then
   printf 'Updating homedash at %s…\n' "$HOMEDASH_DIR"
   git -C "$HOMEDASH_DIR" pull --ff-only
+elif [[ -d "$HOMEDASH_DIR" ]] && rmdir "$HOMEDASH_DIR" 2>/dev/null; then
+  install_checkout
 elif [[ -e "$HOMEDASH_DIR" ]]; then
   fail "$HOMEDASH_DIR already exists but is not a git checkout."
 else
-  printf 'Installing homedash at %s…\n' "$HOMEDASH_DIR"
-  git clone --depth 1 "$HOMEDASH_REPO" "$HOMEDASH_DIR"
+  install_checkout
 fi
 
 LLMDASH_URL="${LLMDASH_URL:-http://hephaestus-developer:8787}" \
