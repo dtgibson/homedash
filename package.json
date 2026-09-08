@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:deploy": "bash -n scripts/install-or-update.sh",
+    "test:deploy": "bash -n scripts/bootstrap.sh scripts/install-or-update.sh",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:deploy && npm run build"
   },
   "repository": {
