@@ -1,0 +1,67 @@
+import path from 'node:path'
+import { z } from 'zod'
+
+const optionalCoordinate = z.preprocess(
+  (value) => (value === '' || value == null ? undefined : value),
+  z.coerce.number().optional(),
+)
+
+const envSchema = z
+  .object({
+    HOMEDASH_HOST: z.string().default('127.0.0.1'),
+    HOMEDASH_PORT: z.coerce.number().int().min(1).max(65_535).default(1910),
+    SNOWRAVEN_URL: z.url().default('http://127.0.0.1:1620'),
+    LLMDASH_URL: z.url().default('http://127.0.0.1:8787'),
+    HOME_LATITUDE: optionalCoordinate,
+    HOME_LONGITUDE: optionalCoordinate,
+    HOME_LABEL: z.string().min(1).max(100).default('Home'),
+    WEATHER_UNIT: z.enum(['fahrenheit', 'celsius']).default('fahrenheit'),
+    EBIRD_RADIUS_KM: z.coerce.number().int().min(1).max(200).default(50),
+    EBIRD_WINDOW_DAYS: z.coerce.number().int().min(1).max(30).default(14),
+    EBIRD_TARGET_LIMIT: z.coerce.number().int().min(1).max(20).default(5),
+    BOOKMARKS_PATH: z.string().default('./config/bookmarks.json'),
+    UPSTREAM_TIMEOUT_MS: z.coerce.number().int().min(500).max(30_000).default(8_000),
+  })
+  .superRefine((value, context) => {
+    if ((value.HOME_LATITUDE == null) !== (value.HOME_LONGITUDE == null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'HOME_LATITUDE and HOME_LONGITUDE must be configured together.',
+      })
+    }
+    if (value.HOME_LATITUDE != null && (value.HOME_LATITUDE < -90 || value.HOME_LATITUDE > 90)) {
+      context.addIssue({ code: 'custom', message: 'HOME_LATITUDE is outside -90…90.' })
+    }
+    if (
+      value.HOME_LONGITUDE != null &&
+      (value.HOME_LONGITUDE < -180 || value.HOME_LONGITUDE > 180)
+    ) {
+      context.addIssue({ code: 'custom', message: 'HOME_LONGITUDE is outside -180…180.' })
+    }
+  })
+
+export type AppConfig = ReturnType<typeof loadConfig>
+
+export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
+  const value = envSchema.parse(source)
+  return {
+    host: value.HOMEDASH_HOST,
+    port: value.HOMEDASH_PORT,
+    snowRavenUrl: value.SNOWRAVEN_URL.replace(/\/$/, ''),
+    llmdashUrl: value.LLMDASH_URL.replace(/\/$/, ''),
+    home:
+      value.HOME_LATITUDE == null || value.HOME_LONGITUDE == null
+        ? null
+        : {
+            latitude: value.HOME_LATITUDE,
+            longitude: value.HOME_LONGITUDE,
+            label: value.HOME_LABEL,
+          },
+    temperatureUnit: value.WEATHER_UNIT,
+    ebirdRadiusKm: value.EBIRD_RADIUS_KM,
+    ebirdWindowDays: value.EBIRD_WINDOW_DAYS,
+    ebirdTargetLimit: value.EBIRD_TARGET_LIMIT,
+    bookmarksPath: path.resolve(value.BOOKMARKS_PATH),
+    upstreamTimeoutMs: value.UPSTREAM_TIMEOUT_MS,
+  }
+}

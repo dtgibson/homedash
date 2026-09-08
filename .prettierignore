@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-server
+pipeline/homedash-v1/design.html
+package-lock.json
+design
+pipeline
+product-brief.md
+ROADMAP.md

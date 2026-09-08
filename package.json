@@ -1,0 +1,70 @@
+{
+  "name": "homedash",
+  "version": "1.0.0",
+  "description": "A private, location-aware home dashboard for the tailnet.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,ui -c yellow,cyan \"tsx watch server/index.ts\" \"vite\"",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "start": "node dist-server/server/index.js",
+    "format": "prettier --write package.json index.html eslint.config.js '*config.ts' 'server/**/*.ts' 'src/**/*.{ts,tsx,css}' 'tests/**/*.ts' 'config/*.example.json'",
+    "format:check": "prettier --check package.json index.html eslint.config.js '*config.ts' 'server/**/*.ts' 'src/**/*.{ts,tsx,css}' 'tests/**/*.ts' 'config/*.example.json'",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:deploy": "bash -n scripts/install-or-update.sh",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:deploy && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dtgibson/homedash.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/dtgibson/homedash/issues"
+  },
+  "homepage": "https://github.com/dtgibson/homedash#readme",
+  "dependencies": {
+    "@fastify/static": "^10.1.3",
+    "@radix-ui/react-toggle-group": "^1.1.19",
+    "csv-parse": "^7.0.2",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.12.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.6",
+    "globals": "^17.12.0",
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
+  }
+}

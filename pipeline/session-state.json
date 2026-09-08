@@ -1,0 +1,21 @@
+{
+  "activeFeature": "homedash-v1",
+  "sessionType": "feature",
+  "entryPath": null,
+  "currentStage": 8,
+  "lastCompletedStage": 7,
+  "lastCheckpointStatus": "approved",
+  "confirmedArtifacts": [
+    "pipeline/homedash-v1/strategic-brief.md",
+    "pipeline/homedash-v1/prd.md",
+    "pipeline/homedash-v1/schema.md",
+    "pipeline/homedash-v1/design-spec.md",
+    "pipeline/homedash-v1/pr-description.md",
+    "pipeline/homedash-v1/qa-report.md",
+    "pipeline/homedash-v1/security-report.md"
+  ],
+  "awaitingHuman": null,
+  "ideaId": null,
+  "createdAt": "2026-09-07T22:53:55Z",
+  "updatedAt": "2026-09-08T13:23:00Z"
+}

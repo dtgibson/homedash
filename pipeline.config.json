@@ -1,0 +1,39 @@
+{
+  "name": "homedash",
+  "type": "web",
+  "entryPath": "new",
+  "repoURL": null,
+  "repoProvider": null,
+  "frontend": "react-vite-typescript-tailwind",
+  "backend": "fastify-node",
+  "emailProvider": null,
+  "smsProvider": null,
+  "deploymentTarget": "local machine or Raspberry Pi over a Tailscale tailnet",
+  "setupComplete": true,
+  "createdAt": "2026-09-08T02:33:17Z",
+  "updatedAt": "2026-09-08T03:08:26Z",
+  "stack": {
+    "language": "TypeScript",
+    "runtime": "Node.js",
+    "packageManager": "npm",
+    "frontend": "React + Vite",
+    "backend": "Fastify",
+    "server": {
+      "bindHost": "127.0.0.1",
+      "port": 1910
+    },
+    "styling": "Tailwind CSS",
+    "componentLibrary": "Radix UI",
+    "database": null,
+    "orm": null,
+    "designTokens": null,
+    "brandSystem": null,
+    "testRunner": "Vitest + React Testing Library + Playwright",
+    "cicd": null,
+    "environments": {
+      "dev": "local machine",
+      "staging": null,
+      "prod": "Raspberry Pi over a Tailscale tailnet"
+    }
+  }
+}

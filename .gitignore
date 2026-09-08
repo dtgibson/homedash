@@ -10,13 +10,23 @@ pnpm-debug.log*
 
 # Build output
 dist/
+dist-server/
 build/
 .cache/
+coverage/
+playwright-report/
+test-results/
 
 # Environment
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
+
+# Private host configuration
+config/bookmarks.json
+config/private.json
 
 # Editor
 .vscode/
