@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Public bootstrap for first installs and later updates:
-#   curl -fsSL https://gist.githubusercontent.com/dtgibson/7412cd394fc0088904f83de72fcf2850/raw/bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dtgibson/homedash/main/scripts/bootstrap.sh | bash
 
 set -Eeuo pipefail
 
-readonly HOMEDASH_REPO="git@github.com:dtgibson/homedash.git"
+readonly HOMEDASH_REPO="https://github.com/dtgibson/homedash.git"
 readonly HOMEDASH_DIR="${HOMEDASH_DIR:-$HOME/homedash}"
 
 fail() {
