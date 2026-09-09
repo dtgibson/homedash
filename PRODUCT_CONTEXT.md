@@ -6,7 +6,7 @@ Homedash is a private, single-owner browser start page that brings the most usef
 
 ## Current Features
 
-- **Dawn and Dense views** — Two complete presentations render the same live values and source states while each browser independently remembers its preferred view and System, Light, or Dark appearance.
+- **Dawn and Dense views** — Two complete presentations render the same live values and source states in one viewport for the normal five-target/five-bookmark payload at 1440×900 and 360×800, fall back to bounded source-region scrolling for shorter or larger cases, and retain per-browser view and appearance preferences.
 - **Location-aware weather and daylight** — Current conditions, forecast, sunrise, and sunset use the device location when available, then an eligible last-known location, then a private Home fallback.
 - **Birding pulse** — eBird-backed monthly progress and nearby lifer, photo, and audio targets are deduplicated and ordered closest-first.
 - **Coding runway** — Claude and Codex five-hour and weekly headroom display the values and reset times supplied by llmdash without reconstructing missing data.

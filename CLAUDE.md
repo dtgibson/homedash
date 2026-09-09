@@ -17,6 +17,11 @@
 - For each eBird target category, deduplicate by canonical species, sort known numeric distances ascending, use recency only to break equal-distance ties, place unknown distances last, and apply the result limit after sorting.
 - Preserve bookmark file order in the UI; do not introduce a client-side editor or competing bookmark store without an explicit product decision.
 
+## Viewport Layout
+
+- Keep Dawn and Dense free of document scrolling for the normal five-target/five-bookmark payload at 1440×900 and 360×800; on shorter viewports or larger payloads, bound overflow to the affected source region.
+- Keep masthead content inside its assigned pane; viewport tests must inspect both the document and nested scroll regions and reserve clearance for visible keyboard-focus outlines.
+
 ## Deployment
 
 - Keep Fastify bound to loopback in production and let Tailscale provide authenticated HTTPS; do not expose the Node listener directly to the LAN or public internet.
