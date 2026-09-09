@@ -47,7 +47,7 @@ export function TargetList({
     <div className={dense ? 'dense-target-list' : 'target-list'} aria-live="polite">
       {targets.map((target) => (
         <div className="target-item" key={target.speciesCode}>
-          <strong>{target.commonName}</strong>
+          <strong title={target.commonName}>{target.commonName}</strong>
           <span className="distance">{formatDistance(target.distanceKm)}</span>
           <span className="where" title={target.locality}>
             {target.locality}

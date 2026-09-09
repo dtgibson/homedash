@@ -43,95 +43,112 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
         </span>
       </header>
 
-      <section className="dense-row" aria-labelledby="dense-weather">
-        <h2 className="dense-label" id="dense-weather">
-          Weather
-        </h2>
-        <div className="dense-content">
-          {data.weather.status === 'loading' && <LoadingState message="Reading weather…" />}
-          {data.weather.status === 'error' && (
-            <ErrorState title="No weather." message={data.weather.message} onRetry={onRetry} />
-          )}
-          {weather && <DenseWeather envelope={weather} />}
-        </div>
-      </section>
+      <div className="dense-grid">
+        <section className="dense-row" aria-labelledby="dense-weather">
+          <h2 className="dense-label" id="dense-weather">
+            Weather
+          </h2>
+          <div className="dense-content">
+            {data.weather.status === 'loading' && <LoadingState message="Reading weather…" />}
+            {data.weather.status === 'error' && (
+              <ErrorState title="No weather." message={data.weather.message} onRetry={onRetry} />
+            )}
+            {weather && <DenseWeather envelope={weather} />}
+          </div>
+        </section>
 
-      <section className="dense-row" aria-labelledby="dense-ebird">
-        <h2 className="dense-label" id="dense-ebird">
-          eBird
-        </h2>
-        <div className="dense-content">
-          {data.ebird.status === 'loading' && <LoadingState message="Reading nearby targets…" />}
-          {data.ebird.status === 'error' && (
-            <ErrorState title="No nearby targets." message={data.ebird.message} onRetry={onRetry} />
-          )}
-          {ebird && (
-            <>
-              <div className="dense-wrap">
-                <span className="dense-primary dense-green">
-                  {ebird.data.month.currentCount} species
-                </span>
-                <span className="dense-soft">
-                  {ebird.data.month.label.toLowerCase()} 1–{ebird.data.month.throughDay}
-                </span>
-                <span className="dense-primary dense-green">
-                  {signed(ebird.data.month.difference)}
-                </span>
-                <span className="dense-faint">vs {ebird.data.month.previousCount} last year</span>
-                <span className="dense-faint">within {ebird.data.radiusKm} km · closest first</span>
-                <span className="dense-faint">
-                  profile {formatAge(ebird.data.profileUpdatedAt)}
-                </span>
-              </div>
-              <TargetTabs dense category={category} summary={ebird.data} onCategory={onCategory} />
-              <TargetList dense targets={ebird.data.targets[category]} />
-              <StateNote meta={ebird.meta} />
-            </>
-          )}
-        </div>
-      </section>
+        <section className="dense-row" aria-labelledby="dense-ebird">
+          <h2 className="dense-label" id="dense-ebird">
+            eBird
+          </h2>
+          <div className="dense-content">
+            {data.ebird.status === 'loading' && <LoadingState message="Reading nearby targets…" />}
+            {data.ebird.status === 'error' && (
+              <ErrorState
+                title="No nearby targets."
+                message={data.ebird.message}
+                onRetry={onRetry}
+              />
+            )}
+            {ebird && (
+              <>
+                <div className="dense-wrap">
+                  <span className="dense-primary dense-green">
+                    {ebird.data.month.currentCount} species
+                  </span>
+                  <span className="dense-soft">
+                    {ebird.data.month.label.toLowerCase()} 1–{ebird.data.month.throughDay}
+                  </span>
+                  <span className="dense-primary dense-green">
+                    {signed(ebird.data.month.difference)}
+                  </span>
+                  <span className="dense-faint">vs {ebird.data.month.previousCount} last year</span>
+                  <span className="dense-faint">
+                    within {ebird.data.radiusKm} km · closest first
+                  </span>
+                  <span className="dense-faint">
+                    profile {formatAge(ebird.data.profileUpdatedAt)}
+                  </span>
+                </div>
+                <TargetTabs
+                  dense
+                  category={category}
+                  summary={ebird.data}
+                  onCategory={onCategory}
+                />
+                <TargetList dense targets={ebird.data.targets[category]} />
+                <StateNote meta={ebird.meta} />
+              </>
+            )}
+          </div>
+        </section>
 
-      <section className="dense-row" aria-labelledby="dense-llmdash">
-        <h2 className="dense-label" id="dense-llmdash">
-          llmdash
-        </h2>
-        <div className="dense-content">
-          {data.llmdash.status === 'loading' && <LoadingState message="Reading coding runway…" />}
-          {data.llmdash.status === 'error' && (
-            <ErrorState
-              title="No coding runway."
-              message={data.llmdash.message}
-              onRetry={onRetry}
-            />
-          )}
-          {llmdash && (
-            <>
-              {llmdash.data.providers.map((provider) => (
-                <DenseProvider provider={provider} key={provider.id} />
-              ))}
-              <StateNote meta={llmdash.meta} />
-            </>
-          )}
-        </div>
-      </section>
+        <section className="dense-row" aria-labelledby="dense-llmdash">
+          <h2 className="dense-label" id="dense-llmdash">
+            llmdash
+          </h2>
+          <div className="dense-content">
+            {data.llmdash.status === 'loading' && <LoadingState message="Reading coding runway…" />}
+            {data.llmdash.status === 'error' && (
+              <ErrorState
+                title="No coding runway."
+                message={data.llmdash.message}
+                onRetry={onRetry}
+              />
+            )}
+            {llmdash && (
+              <>
+                {llmdash.data.providers.map((provider) => (
+                  <DenseProvider provider={provider} key={provider.id} />
+                ))}
+                <StateNote meta={llmdash.meta} />
+              </>
+            )}
+          </div>
+        </section>
 
-      <section className="dense-row" aria-labelledby="dense-bookmarks">
-        <h2 className="dense-label" id="dense-bookmarks">
-          Bookmarks
-        </h2>
-        <div className="dense-content">
-          {data.bookmarks.status === 'loading' && <LoadingState message="Reading bookmarks…" />}
-          {data.bookmarks.status === 'error' && (
-            <ErrorState title="No bookmarks." message={data.bookmarks.message} onRetry={onRetry} />
-          )}
-          {bookmarks && (
-            <>
-              <BookmarkGroups dense bookmarks={bookmarks.data.bookmarks} />
-              <StateNote meta={bookmarks.meta} />
-            </>
-          )}
-        </div>
-      </section>
+        <section className="dense-row" aria-labelledby="dense-bookmarks">
+          <h2 className="dense-label" id="dense-bookmarks">
+            Bookmarks
+          </h2>
+          <div className="dense-content">
+            {data.bookmarks.status === 'loading' && <LoadingState message="Reading bookmarks…" />}
+            {data.bookmarks.status === 'error' && (
+              <ErrorState
+                title="No bookmarks."
+                message={data.bookmarks.message}
+                onRetry={onRetry}
+              />
+            )}
+            {bookmarks && (
+              <>
+                <BookmarkGroups dense bookmarks={bookmarks.data.bookmarks} />
+                <StateNote meta={bookmarks.meta} />
+              </>
+            )}
+          </div>
+        </section>
+      </div>
     </main>
   )
 }

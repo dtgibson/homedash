@@ -41,7 +41,7 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
   return (
     <main className="dawn" aria-labelledby="dawn-title">
       <header className="dawn-masthead">
-        <div>
+        <div className="dawn-heading-line">
           <p className="eyebrow">{dateLabel()}</p>
           <h1 id="dawn-title">{dayGreeting()}</h1>
           <p className="lede">{lede}</p>
@@ -49,8 +49,8 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
         {weather ? <SunArc envelope={weather} /> : <LoadingState message="Reading daylight…" />}
       </header>
 
-      <div className="dawn-grid">
-        <article className="weather-story data-block" aria-labelledby="weather-heading">
+      <div className="dawn-composition">
+        <article className="story weather-story data-block" aria-labelledby="weather-heading">
           <div className="story-heading">
             <h2 id="weather-heading">The day ahead</h2>
             {weather && (
@@ -75,7 +75,7 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
           {weather && <DawnWeather envelope={weather} />}
         </article>
 
-        <article className="bird-story data-block" aria-labelledby="bird-heading">
+        <article className="story bird-story data-block" aria-labelledby="bird-heading">
           <div className="story-heading">
             <h2 id="bird-heading">Birding pulse</h2>
             {ebird && (
@@ -125,60 +125,67 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
           )}
         </article>
 
-        <section className="usage-story data-block" aria-labelledby="usage-heading">
-          <div className="usage-intro">
-            <p className="section-kicker">
-              llmdash{llmdash ? ` · updated ${formatAge(llmdash.meta.sourceUpdatedAt)}` : ''}
+        <aside className="story utility-story" aria-label="Coding runway and bookmarks">
+          <section
+            className="usage-story utility-section data-block"
+            aria-labelledby="usage-heading"
+          >
+            <div className="usage-intro utility-head">
+              <h2 id="usage-heading">Coding runway</h2>
+              <span className="meta">
+                llmdash{llmdash ? ` · ${formatAge(llmdash.meta.sourceUpdatedAt)}` : ''}
+              </span>
+            </div>
+            <p className="utility-copy">
+              Authoritative remaining headroom from llmdash. Missing windows stay unfilled.
             </p>
-            <h2 id="usage-heading">Coding runway</h2>
-            <p>Authoritative remaining headroom from llmdash. Missing windows stay unfilled.</p>
-          </div>
-          {data.llmdash.status === 'loading' && (
-            <LoadingState message="Reading authoritative limits from llmdash…" />
-          )}
-          {data.llmdash.status === 'error' && (
-            <ErrorState
-              title="Coding runway is unavailable."
-              message={data.llmdash.message}
-              onRetry={onRetry}
-            />
-          )}
-          {llmdash && (
-            <>
-              {llmdash.data.providers.map((provider) => (
-                <DawnProvider provider={provider} key={provider.id} />
-              ))}
-              <StateNote meta={llmdash.meta} />
-            </>
-          )}
-        </section>
+            {data.llmdash.status === 'loading' && (
+              <LoadingState message="Reading authoritative limits from llmdash…" />
+            )}
+            {data.llmdash.status === 'error' && (
+              <ErrorState
+                title="Coding runway is unavailable."
+                message={data.llmdash.message}
+                onRetry={onRetry}
+              />
+            )}
+            {llmdash && (
+              <>
+                {llmdash.data.providers.map((provider) => (
+                  <DawnProvider provider={provider} key={provider.id} />
+                ))}
+                <StateNote meta={llmdash.meta} />
+              </>
+            )}
+          </section>
 
-        <section className="bookmarks-story" aria-labelledby="bookmark-heading">
-          <div className="bookmarks-head">
-            <h2 id="bookmark-heading">Places to go</h2>
-            <span className="meta">
-              {bookmarks
-                ? `${bookmarks.data.bookmarks.length} bookmarks · host configuration`
-                : 'host configuration'}
-            </span>
-          </div>
-          {data.bookmarks.status === 'loading' && (
-            <LoadingState message="Reading bookmark configuration…" />
-          )}
-          {data.bookmarks.status === 'error' && (
-            <ErrorState
-              title="Bookmarks need configuration."
-              message={data.bookmarks.message}
-              onRetry={onRetry}
-            />
-          )}
-          {bookmarks && (
-            <>
-              <BookmarkGroups bookmarks={bookmarks.data.bookmarks} />
-              <StateNote meta={bookmarks.meta} />
-            </>
-          )}
-        </section>
+          <section className="bookmarks-story utility-section" aria-labelledby="bookmark-heading">
+            <div className="bookmarks-head utility-head">
+              <h2 id="bookmark-heading">Places to go</h2>
+              <span className="meta">
+                {bookmarks
+                  ? `${bookmarks.data.bookmarks.length} bookmarks · host order`
+                  : 'host order'}
+              </span>
+            </div>
+            {data.bookmarks.status === 'loading' && (
+              <LoadingState message="Reading bookmark configuration…" />
+            )}
+            {data.bookmarks.status === 'error' && (
+              <ErrorState
+                title="Bookmarks need configuration."
+                message={data.bookmarks.message}
+                onRetry={onRetry}
+              />
+            )}
+            {bookmarks && (
+              <>
+                <BookmarkGroups bookmarks={bookmarks.data.bookmarks} />
+                <StateNote meta={bookmarks.meta} />
+              </>
+            )}
+          </section>
+        </aside>
       </div>
     </main>
   )

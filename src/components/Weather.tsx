@@ -75,7 +75,11 @@ export function DawnWeather({ envelope }: { envelope: WeatherEnvelope }) {
         <div className="weather-prose">
           <strong>{weather.condition}.</strong>
           <p>
-            High {formatTemperature(weather.high)} · Low {formatTemperature(weather.low)}
+            Feels{' '}
+            {weather.apparentTemperature == null
+              ? 'unavailable'
+              : formatTemperature(weather.apparentTemperature)}{' '}
+            · High {formatTemperature(weather.high)} · Low {formatTemperature(weather.low)}
             <br />
             {formatPercent(weather.precipitationProbability)} chance of rain
             {weather.windSpeed == null ? '' : ` · wind at ${Math.round(weather.windSpeed)}`}
@@ -123,6 +127,15 @@ export function DenseWeather({ envelope }: { envelope: WeatherEnvelope }) {
         <span className="dense-primary">{formatTemperature(weather.low)}</span>
         <span className="dense-faint">rain {formatPercent(weather.precipitationProbability)}</span>
         <span className="dense-faint">
+          feels{' '}
+          {weather.apparentTemperature == null
+            ? 'unavailable'
+            : formatTemperature(weather.apparentTemperature)}
+        </span>
+        <span className="dense-faint">
+          wind {weather.windSpeed == null ? 'unavailable' : Math.round(weather.windSpeed)}
+        </span>
+        <span className="dense-faint">
           <LocationProvenance envelope={envelope} />
         </span>
       </div>
@@ -137,6 +150,9 @@ export function DenseWeather({ envelope }: { envelope: WeatherEnvelope }) {
         ))}
         <span className="dense-faint">sunrise {formatTime(weather.sunrise)}</span>
         <span className="dense-faint">sunset {formatTime(weather.sunset)}</span>
+        <span className="dense-faint">
+          daylight {Math.floor(weather.daylightMinutes / 60)}h {weather.daylightMinutes % 60}m
+        </span>
       </div>
       <StateNote meta={envelope.meta} />
     </>
