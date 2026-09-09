@@ -44,7 +44,10 @@ test.beforeEach(async ({ context, page }) => {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     let body: unknown
-    if (path === '/api/weather') {
+    if (/^\/api\/bookmarks\/[^/]+\/favicon$/.test(path)) {
+      await route.fulfill({ status: 404, headers: { 'cache-control': 'private, max-age=900' } })
+      return
+    } else if (path === '/api/weather') {
       body = {
         schemaVersion: 1,
         data: {
@@ -193,35 +196,35 @@ test.beforeEach(async ({ context, page }) => {
         data: {
           bookmarks: [
             {
-              id: 'gmail',
+              id: '0000000000000001',
               group: 'Daily',
               name: 'Gmail',
               url: 'https://mail.google.com',
               order: 0,
             },
             {
-              id: 'calendar',
+              id: '0000000000000002',
               group: 'Daily',
               name: 'Calendar',
               url: 'https://calendar.google.com',
               order: 1,
             },
             {
-              id: 'github',
+              id: '0000000000000003',
               group: 'Projects',
               name: 'GitHub',
               url: 'https://github.com',
               order: 2,
             },
             {
-              id: 'ebird',
+              id: '0000000000000004',
               group: 'Birding',
               name: 'eBird',
               url: 'https://ebird.org',
               order: 3,
             },
             {
-              id: 'macaulay',
+              id: '0000000000000005',
               group: 'Birding',
               name: 'Macaulay Library',
               url: 'https://macaulaylibrary.org',
@@ -622,7 +625,9 @@ test('Kagi query stays ephemeral, trims on submit, and focus is not reclaimed', 
   expect(await page.evaluate(() => localStorage.getItem('kagi') ?? '')).toBe('')
 })
 
-test('named mobile controls keep a 44 by 44 touch baseline', async ({ page }, testInfo) => {
+test('named mobile controls and bookmarks keep their touch baselines', async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'Mobile touch-target coverage')
 
   const expectTouchTarget = async (label: string, locator: ReturnType<typeof page.getByRole>) => {
@@ -647,7 +652,13 @@ test('named mobile controls keep a 44 by 44 touch baseline', async ({ page }, te
     await expectTouchTarget(name, page.getByRole('radio', { name, exact: true }))
   }
   for (const name of bookmarkNames) {
-    await expectTouchTarget(name, page.getByRole('link', { name, exact: true }))
+    const bookmark = page.getByRole('link', { name, exact: true })
+    const bounds = await bookmark.evaluate((element) => {
+      const rectangle = element.getBoundingClientRect()
+      return { width: rectangle.width, height: rectangle.height }
+    })
+    expect(bounds.width, `${name} width`).toBeGreaterThanOrEqual(48)
+    expect(bounds.height, `${name} height`).toBeGreaterThanOrEqual(48)
   }
 
   await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
@@ -670,6 +681,228 @@ test('named mobile controls keep a 44 by 44 touch baseline', async ({ page }, te
   await expectTouchTarget('Empty bookmarks retry', retry)
 })
 
+test('favicons stay decorative, same-origin, stable, and inside the release viewport matrix', async ({
+  page,
+}, testInfo) => {
+  const validPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  )
+  const faviconRequests: string[] = []
+  await page.route('**/api/bookmarks/*/favicon', async (route) => {
+    const url = new URL(route.request().url())
+    faviconRequests.push(url.toString())
+    if (url.pathname.includes('0000000000000001') || url.pathname.includes('0000000000000003')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        headers: { 'cache-control': 'private, max-age=86400' },
+        body: validPng,
+      })
+      return
+    }
+    await route.fulfill({ status: 404, headers: { 'cache-control': 'private, max-age=900' } })
+  })
+
+  const documentResponse = await page.goto('/')
+  expect(documentResponse?.headers()['content-security-policy']).toContain("img-src 'self' data:")
+  await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
+  await expect(page.locator('.bookmark-favicon[data-loaded="true"]')).toHaveCount(2)
+  await expect(page.locator('.bookmark-fallback')).toHaveCount(3)
+
+  for (const name of bookmarkNames) {
+    const link = page.getByRole('link', { name, exact: true })
+    await expect(link).toBeVisible()
+    await expect(link.locator('.bookmark-mark')).toHaveAttribute('aria-hidden', 'true')
+    await expect(link.locator('.bookmark-favicon')).toHaveCount(
+      name === 'Gmail' || name === 'GitHub' ? 1 : 0,
+    )
+    await expect(link).not.toHaveAttribute('target')
+  }
+  expect(faviconRequests.length).toBeGreaterThanOrEqual(5)
+  expect(
+    faviconRequests.every((request) => new URL(request).origin === 'http://127.0.0.1:1910'),
+  ).toBe(true)
+
+  const expectedHrefs = [
+    'https://mail.google.com/',
+    'https://calendar.google.com/',
+    'https://github.com/',
+    'https://ebird.org/',
+    'https://macaulaylibrary.org/',
+  ]
+  const appearances = ['System', 'Light', 'Dark'] as const
+  const modes = [
+    { name: 'Use Dawn display mode', value: 'dawn' },
+    { name: 'Use Dense display mode', value: 'dense' },
+  ] as const
+
+  for (const mode of modes) {
+    await page.getByRole('radio', { name: mode.name }).click()
+    for (const appearance of appearances) {
+      await page.getByRole('radio', { name: appearance, exact: true }).click()
+      await expect(page.getByRole('link', { name: 'Gmail', exact: true })).toBeVisible()
+      const result = await page.evaluate(
+        ({ mobile }) => {
+          const links = [...document.querySelectorAll<HTMLElement>('.bookmark-link')]
+          const rectangles = links.map((element) => element.getBoundingClientRect())
+          const overlap = rectangles.some((left, leftIndex) =>
+            rectangles.some(
+              (right, rightIndex) =>
+                rightIndex > leftIndex &&
+                Math.min(left.right, right.right) > Math.max(left.left, right.left) &&
+                Math.min(left.bottom, right.bottom) > Math.max(left.top, right.top),
+            ),
+          )
+          return {
+            names: links.map((element) =>
+              element.querySelector<HTMLElement>('.bookmark-name')?.textContent?.trim(),
+            ),
+            hrefs: links.map((element) => (element as HTMLAnchorElement).href),
+            documentWidth:
+              document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+            documentHeight:
+              document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+            bookmarkOverflow: [...document.querySelectorAll<HTMLElement>('.bookmark-scroll')]
+              .filter(
+                (element) =>
+                  element.scrollWidth > element.clientWidth + 1 ||
+                  element.scrollHeight > element.clientHeight + 1,
+              )
+              .map((element) => ({
+                clientWidth: element.clientWidth,
+                scrollWidth: element.scrollWidth,
+                clientHeight: element.clientHeight,
+                scrollHeight: element.scrollHeight,
+              })),
+            undersized: mobile
+              ? rectangles.filter((rectangle) => rectangle.width < 48 || rectangle.height < 48)
+                  .length
+              : 0,
+            outsideViewport: rectangles.filter(
+              (rectangle) =>
+                rectangle.left < 0 ||
+                rectangle.right > window.innerWidth ||
+                rectangle.top < 0 ||
+                rectangle.bottom > window.innerHeight,
+            ).length,
+            overlap,
+          }
+        },
+        { mobile: testInfo.project.name === 'mobile-chromium' },
+      )
+      expect(result).toEqual({
+        names: bookmarkNames,
+        hrefs: expectedHrefs,
+        documentWidth: true,
+        documentHeight: true,
+        bookmarkOverflow: [],
+        undersized: 0,
+        outsideViewport: 0,
+        overlap: false,
+      })
+    }
+  }
+
+  if (testInfo.project.name === 'mobile-chromium') {
+    const link = page.getByRole('link', { name: 'GitHub', exact: true })
+    const before = await page.evaluate(() => ({
+      documentTop: document.documentElement.scrollTop,
+      regions: [...document.querySelectorAll<HTMLElement>('.bookmark-scroll')].map(
+        (element) => element.scrollTop,
+      ),
+    }))
+    await page.keyboard.press('Tab')
+    await link.focus()
+    await expect(link).toHaveCSS('outline-width', '2px')
+    await expect(link).toHaveCSS('outline-offset', '3px')
+    const focus = await link.evaluate((element) => {
+      const rectangle = element.getBoundingClientRect()
+      const boundary = element.closest<HTMLElement>('.bookmark-scroll')!.getBoundingClientRect()
+      return {
+        left: rectangle.left - boundary.left,
+        right: boundary.right - rectangle.right,
+        top: rectangle.top - boundary.top,
+        bottom: boundary.bottom - rectangle.bottom,
+      }
+    })
+    expect(Math.min(focus.left, focus.right, focus.top, focus.bottom)).toBeGreaterThanOrEqual(5)
+    expect(
+      await page.evaluate(() => ({
+        documentTop: document.documentElement.scrollTop,
+        regions: [...document.querySelectorAll<HTMLElement>('.bookmark-scroll')].map(
+          (element) => element.scrollTop,
+        ),
+      })),
+    ).toEqual(before)
+  }
+
+  const externalRequests: string[] = []
+  page.on('request', (request) => {
+    if (request.url().startsWith('https://external-icons.invalid/')) {
+      externalRequests.push(request.url())
+    }
+  })
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const image = new Image()
+        image.onload = () => resolve()
+        image.onerror = () => resolve()
+        image.src = 'https://external-icons.invalid/favicon.ico'
+        document.body.append(image)
+      }),
+  )
+  expect(externalRequests).toEqual([])
+})
+
+test('an oversized bookmark payload scrolls only inside its own short mobile region', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile-chromium', 'Exceptional mobile overflow coverage')
+  await page.setViewportSize({ width: 360, height: 650 })
+  await page.route('**/api/bookmarks', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        bookmarkSnapshot(
+          Array.from({ length: 12 }, (_, index) => ({
+            id: index.toString(16).padStart(16, '0'),
+            group: ['Daily', 'Projects', 'Birding'][index % 3]!,
+            name: `Destination ${index + 1}`,
+            url: `https://destination-${index + 1}.example/path`,
+            order: index,
+          })),
+        ),
+      ),
+    })
+  })
+  await page.goto('/')
+  await expect(page.getByRole('link', { name: 'Destination 1', exact: true })).toBeVisible()
+  const overflow = await page.evaluate(() => {
+    const bookmarkRegion = document.querySelector<HTMLElement>('.bookmark-scroll')!
+    return {
+      documentWidth: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      documentHeight:
+        document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+      bodyTop: document.documentElement.scrollTop,
+      regionVertical: bookmarkRegion.scrollHeight > bookmarkRegion.clientHeight,
+      regionHorizontal: bookmarkRegion.scrollWidth > bookmarkRegion.clientWidth + 1,
+    }
+  })
+  expect(overflow).toEqual({
+    documentWidth: true,
+    documentHeight: true,
+    bodyTop: 0,
+    regionVertical: true,
+    regionHorizontal: false,
+  })
+  await page.getByRole('link', { name: 'Destination 12', exact: true }).focus()
+  await expect(page.getByRole('link', { name: 'Destination 12', exact: true })).toBeFocused()
+  expect(await page.evaluate(() => document.documentElement.scrollTop)).toBe(0)
+})
+
 test('moon phase is shared across the release viewport, mode, and appearance matrix without new requests', async ({
   page,
 }) => {
@@ -678,7 +911,7 @@ test('moon phase is shared across the release viewport, mode, and appearance mat
   const apiRequests: string[] = []
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname
-    if (path.startsWith('/api/')) apiRequests.push(path)
+    if (path.startsWith('/api/') && !path.endsWith('/favicon')) apiRequests.push(path)
   })
 
   await page.goto('/')

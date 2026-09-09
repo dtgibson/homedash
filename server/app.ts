@@ -8,6 +8,7 @@ import { BookmarkService } from './bookmarks.js'
 import type { AppConfig } from './config.js'
 import { EbirdService } from './ebird.js'
 import { safeErrorBody, SourceError } from './errors.js'
+import { FAVICON_DEADLINE_MS, FaviconResolver } from './favicon.js'
 import { LlmdashService } from './llmdash.js'
 import { resolveLocation } from './location.js'
 import type { FetchLike } from './types.js'
@@ -47,6 +48,11 @@ function isLaunchNamespace(url: string | undefined) {
   return pathOnly === '/launch' || pathOnly.startsWith('/launch/')
 }
 
+function isFaviconNamespace(url: string | undefined) {
+  const pathOnly = (url ?? '').split('?', 1)[0].toLowerCase()
+  return pathOnly.startsWith('/api/bookmarks/')
+}
+
 function invalidLaunchRequest() {
   return safeErrorBody(
     new SourceError('invalid-configuration', 'The launch request is invalid.', false, 400),
@@ -63,6 +69,10 @@ function applySecurityHeaders(reply: FastifyReply) {
   for (const [name, value] of Object.entries(securityHeaders)) reply.header(name, value)
 }
 
+function sendEmptyFavicon(reply: FastifyReply, cacheControl: string) {
+  return reply.status(404).header('cache-control', cacheControl).send()
+}
+
 export async function buildApp(options: BuildAppOptions) {
   const app = Fastify({
     logger: false,
@@ -70,6 +80,10 @@ export async function buildApp(options: BuildAppOptions) {
     frameworkErrors: (error, request, reply) => {
       const frameworkReply = reply as FastifyReply
       applySecurityHeaders(frameworkReply)
+      if (isFaviconNamespace(request.raw.url)) {
+        sendEmptyFavicon(frameworkReply, 'no-store')
+        return
+      }
       if (isLaunchNamespace(request.raw.url)) {
         frameworkReply.status(400).send(invalidLaunchRequest())
         return
@@ -85,6 +99,7 @@ export async function buildApp(options: BuildAppOptions) {
   })
   const weather = new WeatherService(options.config, options.fetchImpl)
   const bookmarks = new BookmarkService(options.config)
+  const favicons = new FaviconResolver(options.fetchImpl)
   const ebird = new EbirdService(options.config, options.fetchImpl)
   const llmdash = new LlmdashService(options.config, options.fetchImpl)
 
@@ -93,14 +108,24 @@ export async function buildApp(options: BuildAppOptions) {
   })
 
   app.addHook('onRequest', async (request, reply) => {
-    const rawPath = (request.raw.url ?? '').split('?', 1)[0].toLowerCase()
+    const rawUrl = request.raw.url ?? ''
+    const rawPath = rawUrl.split('?', 1)[0]
     if (
-      rawPath.startsWith('/launch/ebird/map/') &&
-      (rawPath.includes('/../') ||
-        rawPath.includes('%2e') ||
-        rawPath.includes('%2f') ||
-        rawPath.includes('%5c') ||
-        rawPath.includes('\\'))
+      isFaviconNamespace(rawUrl) &&
+      (request.method !== 'GET' ||
+        rawUrl.includes('?') ||
+        !/^\/api\/bookmarks\/[a-f0-9]{16}\/favicon$/.test(rawPath))
+    ) {
+      return sendEmptyFavicon(reply, 'no-store')
+    }
+    const normalizedRawPath = rawPath.toLowerCase()
+    if (
+      normalizedRawPath.startsWith('/launch/ebird/map/') &&
+      (normalizedRawPath.includes('/../') ||
+        normalizedRawPath.includes('%2e') ||
+        normalizedRawPath.includes('%2f') ||
+        normalizedRawPath.includes('%5c') ||
+        normalizedRawPath.includes('\\'))
     ) {
       return reply.status(400).send(invalidLaunchRequest())
     }
@@ -205,6 +230,43 @@ export async function buildApp(options: BuildAppOptions) {
     }
   })
 
+  app.get<{ Params: { bookmarkId: string } }>(
+    '/api/bookmarks/:bookmarkId/favicon',
+    { exposeHeadRoute: false },
+    async (request, reply) => {
+      const deadlineAtMs = Date.now() + FAVICON_DEADLINE_MS
+      let bookmark
+      let timeout: ReturnType<typeof setTimeout> | undefined
+      try {
+        bookmark = await Promise.race([
+          bookmarks.findCurrentById(request.params.bookmarkId).catch(() => null),
+          new Promise<null>((resolve) => {
+            timeout = setTimeout(() => resolve(null), Math.max(0, deadlineAtMs - Date.now()))
+          }),
+        ])
+      } catch {
+        bookmark = null
+      } finally {
+        if (timeout) clearTimeout(timeout)
+      }
+      if (!bookmark) {
+        favicons.invalidateBookmarkId(request.params.bookmarkId)
+        return sendEmptyFavicon(reply, 'no-store')
+      }
+
+      const outcome = await favicons.resolve(bookmark, deadlineAtMs)
+      if (outcome.kind === 'unavailable') {
+        return sendEmptyFavicon(reply, 'private, max-age=900')
+      }
+      return reply
+        .status(200)
+        .header('content-type', outcome.image.mimeType)
+        .header('content-length', String(outcome.image.bytes.byteLength))
+        .header('cache-control', 'private, max-age=86400')
+        .send(Buffer.from(outcome.image.bytes))
+    },
+  )
+
   app.post('/api/ebird/summary', async (request, reply) => {
     const parsed = ebirdRequestSchema.safeParse(request.body)
     if (!parsed.success) {
@@ -249,6 +311,7 @@ export async function buildApp(options: BuildAppOptions) {
     await app.register(fastifyStatic, { root: distRoot, wildcard: false })
   }
   app.setNotFoundHandler((request, reply) => {
+    if (isFaviconNamespace(request.raw.url)) return sendEmptyFavicon(reply, 'no-store')
     if (
       servesClient &&
       request.method === 'GET' &&

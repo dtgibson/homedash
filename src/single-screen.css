@@ -563,8 +563,11 @@ a.target-item:hover strong {
 }
 
 .bookmarks-story {
+  display: grid;
   grid-column: auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
   padding: 0;
+  overflow: hidden;
 }
 
 .bookmarks-head {
@@ -587,10 +590,12 @@ a.target-item:hover strong {
 .bookmark-group a {
   gap: 5px;
   min-height: 32px;
+  padding: 5px 4px;
   font-size: 10px;
+  line-height: 1.18;
 }
 
-.bookmark-group a::after {
+.bookmark-arrow {
   font-size: 8px;
 }
 
@@ -715,7 +720,20 @@ a.target-item:hover strong {
 
 .dense-bookmarks a {
   min-height: 27px;
+  padding: 4px;
   font-size: 9px;
+  line-height: 1.18;
+}
+
+.dense-bookmarks-row {
+  overflow: hidden;
+}
+
+.dense-bookmarks-row .dense-content {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Source-local freshness stays fixed while values refresh in place. */
@@ -1025,7 +1043,7 @@ a.target-item:hover strong {
 
   .dawn-composition {
     grid-template-columns: 1fr;
-    grid-template-rows: 126px minmax(257px, 1fr) 145px;
+    grid-template-rows: 117px minmax(257px, 1fr) 157px;
     height: calc(100% - 60px);
   }
 
@@ -1038,7 +1056,8 @@ a.target-item:hover strong {
     grid-template-columns: 96px minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
     gap: 0 9px;
-    padding-bottom: 7px;
+    padding-top: 2px;
+    padding-bottom: 2px;
     border-bottom: 1px solid var(--line);
   }
 
@@ -1120,7 +1139,7 @@ a.target-item:hover strong {
   }
 
   .bird-story {
-    padding: 5px 0;
+    padding: 2px 0;
     border-bottom: 1px solid var(--line-strong);
     border-left: 0;
   }
@@ -1222,8 +1241,8 @@ a.target-item:hover strong {
   .utility-story {
     grid-column: auto;
     grid-template-rows: 1fr;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 9px;
     padding: 5px 0 0;
     border-top: 0;
     border-left: 0;
@@ -1235,8 +1254,13 @@ a.target-item:hover strong {
     scrollbar-width: thin;
   }
 
+  .bookmarks-story {
+    overflow: hidden;
+  }
+
   .utility-section + .utility-section {
     padding: 0 0 0 9px;
+    border-top: 0;
     border-left: 1px solid var(--line);
   }
 
@@ -1298,7 +1322,7 @@ a.target-item:hover strong {
 
   .bookmark-columns {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2px 7px;
+    gap: 2px 5px;
   }
 
   .bookmark-group h3 {
@@ -1308,12 +1332,15 @@ a.target-item:hover strong {
   }
 
   .bookmark-group a {
-    min-height: 44px;
+    gap: 5px;
+    min-width: 48px;
+    min-height: 48px;
+    padding: 4px 2px;
     font-size: 8.5px;
     line-height: 1.1;
   }
 
-  .bookmark-group a::after {
+  .bookmark-arrow {
     display: none;
   }
 
@@ -1369,7 +1396,7 @@ a.target-item:hover strong {
   }
 
   .dense-grid {
-    grid-template-rows: 95px minmax(327px, 1fr) 92px 131px;
+    grid-template-rows: 87px minmax(307px, 1fr) 86px 146px;
     height: calc(100% - 20px);
   }
 
@@ -1481,8 +1508,12 @@ a.target-item:hover strong {
   }
 
   .dense-bookmarks a {
-    min-height: 44px;
+    gap: 5px;
+    min-width: 48px;
+    min-height: 48px;
+    padding: 4px 2px;
     font-size: 7px;
+    line-height: 1.1;
   }
 
   .dense-bookmarks h3 {
@@ -1506,6 +1537,21 @@ a.target-item:hover strong {
   .month-launch,
   .source-launch {
     min-height: 44px;
+  }
+}
+
+@media (max-width: 680px) and (max-height: 760px) {
+  .dawn-masthead {
+    height: 50px;
+  }
+
+  .dawn-composition {
+    grid-template-rows: 104px minmax(0, 1fr) 190px;
+    height: calc(100% - 50px);
+  }
+
+  .dense-grid {
+    grid-template-rows: 75px minmax(0, 1fr) 75px 150px;
   }
 }
 

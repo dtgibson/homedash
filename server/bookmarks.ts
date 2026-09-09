@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { z } from 'zod'
-import { bookmarkUrlSchema, type BookmarksEnvelope } from '../src/shared/contracts.js'
+import {
+  bookmarkUrlSchema,
+  type Bookmark,
+  type BookmarksEnvelope,
+} from '../src/shared/contracts.js'
 import type { AppConfig } from './config.js'
 import { SourceError } from './errors.js'
 
@@ -92,5 +96,10 @@ export class BookmarkService {
         503,
       )
     }
+  }
+
+  async findCurrentById(id: string): Promise<Bookmark | null> {
+    await this.load()
+    return this.lastGood?.data.bookmarks.find((bookmark) => bookmark.id === id) ?? null
   }
 }
