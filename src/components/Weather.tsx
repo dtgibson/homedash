@@ -1,6 +1,5 @@
 import type { WeatherEnvelope } from '../shared/contracts'
 import { formatAge, formatPercent, formatTemperature, formatTime } from '../lib/format'
-import { StateNote } from './WidgetState'
 
 export function LocationProvenance({ envelope }: { envelope: WeatherEnvelope }) {
   const location = envelope.meta.location
@@ -109,7 +108,6 @@ export function DawnWeather({ envelope }: { envelope: WeatherEnvelope }) {
           <dd>{formatTime(weather.sunset)}</dd>
         </div>
       </dl>
-      <StateNote meta={envelope.meta} />
     </>
   )
 }
@@ -154,7 +152,6 @@ export function DenseWeather({ envelope }: { envelope: WeatherEnvelope }) {
           daylight {Math.floor(weather.daylightMinutes / 60)}h {weather.daylightMinutes % 60}m
         </span>
       </div>
-      <StateNote meta={envelope.meta} />
     </>
   )
 }

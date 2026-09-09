@@ -28,6 +28,8 @@ interface ToolbarProps {
   onStatus: (message: string) => void
   locating: boolean
   refreshing: boolean
+  refreshProgress: number
+  visibleSourceCount: number
 }
 
 export function Toolbar({
@@ -38,15 +40,22 @@ export function Toolbar({
   onStatus,
   locating,
   refreshing,
+  refreshProgress,
+  visibleSourceCount,
 }: ToolbarProps) {
   const queryRef = useRef<HTMLInputElement>(null)
   const hasFocusedSearch = useRef(false)
+  const refreshInFlight = useRef(refreshing)
 
   useEffect(() => {
     if (hasFocusedSearch.current) return
     hasFocusedSearch.current = true
     queryRef.current?.focus({ preventScroll: true })
   }, [])
+
+  useEffect(() => {
+    refreshInFlight.current = refreshing
+  }, [refreshing])
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     const query = queryRef.current
@@ -59,6 +68,12 @@ export function Toolbar({
       return
     }
     query.value = trimmed
+  }
+
+  const requestRefresh = () => {
+    if (refreshing || refreshInFlight.current) return
+    refreshInFlight.current = true
+    onRefresh()
   }
 
   return (
@@ -131,7 +146,7 @@ export function Toolbar({
           className={`icon-button ${locating ? 'is-busy' : ''}`}
           type="button"
           onClick={onLocation}
-          disabled={locating}
+          disabled={locating || refreshing}
           aria-label="Update device location"
         >
           <LocationIcon />
@@ -140,12 +155,17 @@ export function Toolbar({
         <button
           className={`icon-button ${refreshing ? 'is-busy' : ''}`}
           type="button"
-          onClick={onRefresh}
-          disabled={refreshing}
-          aria-label="Refresh weather, bookmarks, eBird, and llmdash data"
+          onClick={requestRefresh}
+          aria-busy={refreshing}
+          aria-disabled={refreshing}
+          aria-label={
+            refreshing
+              ? `Refreshing ${refreshProgress} of 4 sources${visibleSourceCount ? '; saved readings remain visible' : ''}`
+              : 'Refresh weather, bookmarks, eBird, and llmdash data'
+          }
         >
           <RefreshIcon />
-          <span>{refreshing ? 'Refreshing' : 'Refresh'}</span>
+          <span>{refreshing ? `Refreshing ${refreshProgress}/4` : 'Refresh'}</span>
         </button>
       </div>
     </header>

@@ -101,7 +101,8 @@ button {
   color: inherit;
 }
 
-button:disabled {
+button:disabled,
+button[aria-disabled='true'] {
   cursor: wait;
   opacity: 0.66;
 }

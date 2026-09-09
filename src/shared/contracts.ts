@@ -78,11 +78,27 @@ export const weatherSummarySchema = z.object({
   hourly: z.array(forecastHourSchema).max(5),
 })
 
+export const bookmarkUrlSchema = z.url().refine(
+  (value) => {
+    try {
+      const url = new URL(value)
+      return (
+        (url.protocol === 'http:' || url.protocol === 'https:') &&
+        url.username === '' &&
+        url.password === ''
+      )
+    } catch {
+      return false
+    }
+  },
+  { message: 'Bookmark URL must use HTTP or HTTPS without credentials.' },
+)
+
 export const bookmarkSchema = z.object({
   id: z.string().min(1).max(80),
   group: z.string().min(1).max(40),
   name: z.string().min(1).max(100),
-  url: z.url(),
+  url: bookmarkUrlSchema,
   order: z.number().int().nonnegative(),
 })
 

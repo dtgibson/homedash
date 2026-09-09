@@ -1,11 +1,11 @@
-import type { DashboardData } from '../hooks/useDashboardData'
+import type { DashboardData, WidgetName } from '../hooks/useDashboardData'
 import { formatAge, formatMiles, signed } from '../lib/format'
 import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DawnProvider } from './Quota'
 import { TargetList, TargetTabs } from './Targets'
 import { DawnWeather, LocationProvenance, SunArc } from './Weather'
-import { ErrorState, LoadingState, StateBadge, StateNote } from './WidgetState'
+import { ErrorState, LoadingState, SourceFreshness, StateBadge } from './WidgetState'
 
 function dayGreeting(date = new Date()) {
   const hour = date.getHours()
@@ -25,7 +25,7 @@ interface ViewProps {
   data: DashboardData
   category: TargetCategory
   onCategory: (category: TargetCategory) => void
-  onRetry: () => void
+  onRetry: (source: WidgetName) => void
 }
 
 export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
@@ -50,7 +50,18 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
       </header>
 
       <div className="dawn-composition">
-        <article className="story weather-story data-block" aria-labelledby="weather-heading">
+        <article
+          className="story weather-story data-block"
+          data-source="weather"
+          data-refresh-state={
+            data.weather.status === 'ready' ? data.weather.refreshStatus : data.weather.status
+          }
+          aria-labelledby="weather-heading"
+          aria-busy={
+            data.weather.status === 'loading' ||
+            (data.weather.status === 'ready' && data.weather.refreshStatus === 'refreshing')
+          }
+        >
           <div className="story-heading">
             <h2 id="weather-heading">The day ahead</h2>
             {weather && (
@@ -62,6 +73,7 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
               </div>
             )}
           </div>
+          <SourceFreshness source="weather" state={data.weather} onRetry={onRetry} />
           {data.weather.status === 'loading' && (
             <LoadingState message="Asking Open-Meteo for the latest reading…" />
           )}
@@ -69,13 +81,24 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
             <ErrorState
               title="Weather could not be reached."
               message={data.weather.message}
-              onRetry={onRetry}
+              onRetry={() => onRetry('weather')}
             />
           )}
           {weather && <DawnWeather envelope={weather} />}
         </article>
 
-        <article className="story bird-story data-block" aria-labelledby="bird-heading">
+        <article
+          className="story bird-story data-block"
+          data-source="ebird"
+          data-refresh-state={
+            data.ebird.status === 'ready' ? data.ebird.refreshStatus : data.ebird.status
+          }
+          aria-labelledby="bird-heading"
+          aria-busy={
+            data.ebird.status === 'loading' ||
+            (data.ebird.status === 'ready' && data.ebird.refreshStatus === 'refreshing')
+          }
+        >
           <div className="story-heading">
             <h2 id="bird-heading">Birding pulse</h2>
             {ebird && (
@@ -84,6 +107,7 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
               </StateBadge>
             )}
           </div>
+          <SourceFreshness source="ebird" state={data.ebird} onRetry={onRetry} />
           {data.ebird.status === 'loading' && (
             <LoadingState message="Matching nearby sightings to your eBird history…" />
           )}
@@ -91,7 +115,7 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
             <ErrorState
               title="Nearby targets are resting."
               message={data.ebird.message}
-              onRetry={onRetry}
+              onRetry={() => onRetry('ebird')}
             />
           )}
           {ebird && (
@@ -125,7 +149,6 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
               </p>
               <TargetTabs category={category} summary={ebird.data} onCategory={onCategory} />
               <TargetList targets={ebird.data.targets[category]} />
-              <StateNote meta={ebird.meta} />
             </>
           )}
         </article>
@@ -133,7 +156,15 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
         <aside className="story utility-story" aria-label="Coding runway and bookmarks">
           <section
             className="usage-story utility-section data-block"
+            data-source="llmdash"
+            data-refresh-state={
+              data.llmdash.status === 'ready' ? data.llmdash.refreshStatus : data.llmdash.status
+            }
             aria-labelledby="usage-heading"
+            aria-busy={
+              data.llmdash.status === 'loading' ||
+              (data.llmdash.status === 'ready' && data.llmdash.refreshStatus === 'refreshing')
+            }
           >
             <div className="usage-intro utility-head">
               <h2 id="usage-heading">Coding runway</h2>
@@ -142,9 +173,10 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
                 href="/launch/llmdash"
                 aria-label="Open llmdash dashboard"
               >
-                llmdash{llmdash ? ` · ${formatAge(llmdash.meta.sourceUpdatedAt)}` : ''}
+                llmdash
               </a>
             </div>
+            <SourceFreshness source="llmdash" state={data.llmdash} onRetry={onRetry} />
             <p className="utility-copy">
               Authoritative remaining headroom from llmdash. Missing windows stay unfilled.
             </p>
@@ -155,7 +187,7 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
               <ErrorState
                 title="Coding runway is unavailable."
                 message={data.llmdash.message}
-                onRetry={onRetry}
+                onRetry={() => onRetry('llmdash')}
               />
             )}
             {llmdash && (
@@ -163,12 +195,24 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
                 {llmdash.data.providers.map((provider) => (
                   <DawnProvider provider={provider} key={provider.id} />
                 ))}
-                <StateNote meta={llmdash.meta} />
               </>
             )}
           </section>
 
-          <section className="bookmarks-story utility-section" aria-labelledby="bookmark-heading">
+          <section
+            className="bookmarks-story utility-section data-block"
+            data-source="bookmarks"
+            data-refresh-state={
+              data.bookmarks.status === 'ready'
+                ? data.bookmarks.refreshStatus
+                : data.bookmarks.status
+            }
+            aria-labelledby="bookmark-heading"
+            aria-busy={
+              data.bookmarks.status === 'loading' ||
+              (data.bookmarks.status === 'ready' && data.bookmarks.refreshStatus === 'refreshing')
+            }
+          >
             <div className="bookmarks-head utility-head">
               <h2 id="bookmark-heading">Places to go</h2>
               <span className="meta">
@@ -177,6 +221,7 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
                   : 'host order'}
               </span>
             </div>
+            <SourceFreshness source="bookmarks" state={data.bookmarks} onRetry={onRetry} />
             {data.bookmarks.status === 'loading' && (
               <LoadingState message="Reading bookmark configuration…" />
             )}
@@ -184,13 +229,12 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
               <ErrorState
                 title="Bookmarks need configuration."
                 message={data.bookmarks.message}
-                onRetry={onRetry}
+                onRetry={() => onRetry('bookmarks')}
               />
             )}
             {bookmarks && (
               <>
                 <BookmarkGroups bookmarks={bookmarks.data.bookmarks} />
-                <StateNote meta={bookmarks.meta} />
               </>
             )}
           </section>

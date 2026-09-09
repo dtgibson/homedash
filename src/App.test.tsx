@@ -7,7 +7,7 @@ const { dashboard } = vi.hoisted(() => {
   const meta = {
     generatedAt: now,
     sourceUpdatedAt: now,
-    freshness: 'fresh' as const,
+    freshness: 'fresh' as 'fresh' | 'stale',
     staleAfterMs: 60_000,
     issues: [],
   }
@@ -16,7 +16,8 @@ const { dashboard } = vi.hoisted(() => {
       data: {
         weather: {
           status: 'ready' as const,
-          message: null,
+          message: null as string | null,
+          refreshStatus: 'idle' as 'idle' | 'refreshing' | 'failed',
           data: {
             schemaVersion: 1 as const,
             data: {
@@ -54,7 +55,8 @@ const { dashboard } = vi.hoisted(() => {
         },
         ebird: {
           status: 'ready' as const,
-          message: null,
+          message: null as string | null,
+          refreshStatus: 'idle' as 'idle' | 'refreshing' | 'failed',
           data: {
             schemaVersion: 1 as const,
             data: {
@@ -89,7 +91,8 @@ const { dashboard } = vi.hoisted(() => {
         },
         llmdash: {
           status: 'ready' as const,
-          message: null,
+          message: null as string | null,
+          refreshStatus: 'idle' as 'idle' | 'refreshing' | 'failed',
           data: {
             schemaVersion: 1 as const,
             data: {
@@ -116,7 +119,8 @@ const { dashboard } = vi.hoisted(() => {
         },
         bookmarks: {
           status: 'ready' as const,
-          message: null,
+          message: null as string | null,
+          refreshStatus: 'idle' as 'idle' | 'refreshing' | 'failed',
           data: {
             schemaVersion: 1 as const,
             data: {
@@ -137,9 +141,12 @@ const { dashboard } = vi.hoisted(() => {
       },
       selector: { kind: 'current' as const, latitude: 37, longitude: -122, capturedAt: now },
       isRefreshing: false,
+      refreshProgress: 4,
+      visibleSourceCount: 4,
       isLocating: false,
       locationMessage: 'Using this device’s current location.',
       retryLocation: vi.fn(async () => undefined),
+      retryWidget: vi.fn(async () => undefined),
       refreshAll: vi.fn(async () => undefined),
     },
   }
@@ -150,8 +157,16 @@ vi.mock('./hooks/useDashboardData', () => ({ useDashboardData: () => dashboard }
 import App from './App'
 
 beforeEach(() => {
+  vi.clearAllMocks()
   localStorage.clear()
   document.documentElement.dataset.appearance = ''
+  dashboard.isRefreshing = false
+  dashboard.refreshProgress = 4
+  dashboard.visibleSourceCount = 4
+  Object.values(dashboard.data).forEach((widget) => {
+    widget.refreshStatus = 'idle'
+    widget.message = null
+  })
 })
 
 describe('one store with two renderers', () => {
@@ -214,7 +229,7 @@ describe('one store with two renderers', () => {
 
     expect(fireEvent(screen.getByRole('search'), event)).toBe(false)
     expect(query).toHaveValue('')
-    expect(screen.getByRole('status')).toHaveTextContent('Enter a search before going to Kagi.')
+    expect(screen.getByText('Enter a search before going to Kagi.')).toBeVisible()
   })
 
   it('exposes equivalent fixed launch links and miles in Dawn and Dense', async () => {
@@ -241,5 +256,38 @@ describe('one store with two renderers', () => {
     await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
     expectLaunches()
     expect(screen.queryByText(/\bkm\b/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the same source freshness and aggregate progress in Dawn and Dense', async () => {
+    const user = userEvent.setup()
+    dashboard.isRefreshing = true
+    dashboard.refreshProgress = 2
+    dashboard.data.ebird.refreshStatus = 'refreshing'
+    dashboard.data.bookmarks.refreshStatus = 'refreshing'
+
+    render(<App />)
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Refreshing 2 of 4 sources; saved readings remain visible',
+      }),
+    ).toHaveTextContent('Refreshing 2/4')
+    expect(screen.getAllByRole('status', { name: /Refreshing/ })).toHaveLength(2)
+
+    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
+    expect(screen.getAllByRole('status', { name: /Refreshing/ })).toHaveLength(2)
+  })
+
+  it('keeps a failed saved reading visible with a source-specific retry', async () => {
+    const user = userEvent.setup()
+    dashboard.data.bookmarks.refreshStatus = 'failed'
+    dashboard.data.bookmarks.message = 'Bookmark refresh timed out.'
+    dashboard.data.bookmarks.data.meta.freshness = 'stale'
+
+    render(<App />)
+
+    expect(screen.getByRole('link', { name: 'GitHub' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Try bookmarks again' }))
+    expect(dashboard.retryWidget).toHaveBeenCalledWith('bookmarks')
   })
 })

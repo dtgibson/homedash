@@ -19,6 +19,24 @@ const targetNames = [
 
 const bookmarkNames = ['Gmail', 'Calendar', 'GitHub', 'eBird', 'Macaulay Library']
 
+function requestGate() {
+  let release!: () => void
+  const promise = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  return { promise, release }
+}
+
+function bookmarkSnapshot(
+  bookmarks: Array<{ id: string; group: string; name: string; url: string; order: number }>,
+) {
+  return {
+    schemaVersion: 1,
+    data: { bookmarks, invalidEntryCount: 0 },
+    meta,
+  }
+}
+
 test.beforeEach(async ({ context, page }) => {
   await context.grantPermissions(['geolocation'], { origin: 'http://127.0.0.1:1910' })
   await context.setGeolocation({ latitude: 37.77, longitude: -122.42 })
@@ -379,6 +397,204 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   })
 })
 
+test('saved readings paint before independent refreshes settle and survive a failed source', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
+  await expect(page.getByText('58°').first()).toBeVisible()
+
+  const gates = {
+    weather: requestGate(),
+    bookmarks: requestGate(),
+    ebird: requestGate(),
+    llmdash: requestGate(),
+  }
+  await page.route('**/api/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/bookmarks') {
+      await gates.bookmarks.promise
+      await route.fallback()
+      return
+    }
+    if (path === '/api/llmdash/summary') {
+      await gates.llmdash.promise
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'llmdash refresh timed out.' }),
+      })
+      return
+    }
+    if (path === '/api/weather') await gates.weather.promise
+    if (path === '/api/ebird/summary') await gates.ebird.promise
+    await route.fallback()
+  })
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+
+  await expect(page.getByText('58°').first()).toBeVisible()
+  await expect(page.getByText('American Redstart')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Gmail' })).toBeVisible()
+  await expect(page.getByText('68%').first()).toBeVisible()
+  await expect(
+    page.getByRole('button', {
+      name: 'Refreshing 0 of 4 sources; saved readings remain visible',
+    }),
+  ).toBeDisabled()
+  await expect(page.getByRole('status', { name: /Refreshing/ })).toHaveCount(4)
+
+  gates.bookmarks.release()
+  await expect(
+    page.getByRole('button', {
+      name: 'Refreshing 1 of 4 sources; saved readings remain visible',
+    }),
+  ).toBeDisabled()
+  await expect(page.getByRole('link', { name: 'Gmail' })).toBeVisible()
+
+  gates.llmdash.release()
+  await expect(page.getByRole('status', { name: /Refresh failed/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Try llmdash again' })).toBeVisible()
+  await expect(page.getByText('68%').first()).toBeVisible()
+  if (testInfo.project.name === 'mobile-chromium') {
+    const retryBounds = await page
+      .getByRole('button', { name: 'Try llmdash again' })
+      .evaluate((element) => {
+        const rectangle = element.getBoundingClientRect()
+        return { width: rectangle.width, height: rectangle.height }
+      })
+    expect(retryBounds.width).toBeGreaterThanOrEqual(44)
+    expect(retryBounds.height).toBeGreaterThanOrEqual(44)
+  }
+
+  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await expect(page.getByText('58°').first()).toBeVisible()
+  await expect(page.getByRole('status', { name: /Refreshing/ })).toHaveCount(2)
+  await expect(page.getByRole('status', { name: /Refresh failed/ })).toBeVisible()
+
+  gates.weather.release()
+  gates.ebird.release()
+  await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
+  await expect(page.getByRole('status', { name: /Up to date/ })).toHaveCount(3)
+  await expect(page.getByRole('status', { name: /Refresh failed/ })).toHaveCount(1)
+})
+
+test('a poisoned bookmark snapshot renders no link before a valid live response', async ({
+  page,
+}) => {
+  const gate = requestGate()
+  await page.route('**/api/bookmarks', async (route) => {
+    await gate.promise
+    await route.fallback()
+  })
+  await page.addInitScript(
+    (snapshot) => {
+      localStorage.setItem('homedash.cache.bookmarks.v1', JSON.stringify(snapshot))
+    },
+    bookmarkSnapshot([
+      {
+        id: 'poisoned',
+        group: 'Daily',
+        name: 'Poisoned bookmark',
+        url: 'javascript:alert(document.domain)',
+        order: 0,
+      },
+    ]),
+  )
+
+  await page.goto('/')
+  await expect(page.getByRole('link', { name: 'Poisoned bookmark' })).toHaveCount(0)
+  await expect(page.locator('a[href^="javascript:"]')).toHaveCount(0)
+  await expect(page.getByRole('status', { name: 'Reading bookmark configuration…' })).toBeVisible()
+
+  gate.release()
+  const liveBookmark = page.getByRole('link', { name: 'Gmail' })
+  await expect(liveBookmark).toHaveAttribute('href', 'https://mail.google.com')
+  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await expect(liveBookmark).toHaveAttribute('href', 'https://mail.google.com')
+})
+
+test('a valid cached HTTP(S) bookmark renders unchanged in Dawn and Dense', async ({ page }) => {
+  const gate = requestGate()
+  await page.route('**/api/bookmarks', async (route) => {
+    await gate.promise
+    await route.fallback()
+  })
+  await page.addInitScript(
+    (snapshot) => {
+      localStorage.setItem('homedash.cache.bookmarks.v1', JSON.stringify(snapshot))
+    },
+    bookmarkSnapshot([
+      {
+        id: 'safe-cached',
+        group: 'Daily',
+        name: 'Safe cached bookmark',
+        url: 'https://example.com/deep?bird=ruff#photos',
+        order: 0,
+      },
+    ]),
+  )
+
+  await page.goto('/')
+  const cachedBookmark = page.getByRole('link', { name: 'Safe cached bookmark' })
+  await expect(cachedBookmark).toHaveAttribute('href', 'https://example.com/deep?bird=ruff#photos')
+  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await expect(cachedBookmark).toHaveAttribute('href', 'https://example.com/deep?bird=ruff#photos')
+
+  gate.release()
+  await expect(page.getByRole('link', { name: 'Gmail' })).toBeVisible()
+})
+
+test('global refresh keeps focus and ignores duplicate pointer and keyboard activation', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const idleRefresh = page.getByRole('button', {
+    name: 'Refresh weather, bookmarks, eBird, and llmdash data',
+  })
+  await expect(idleRefresh).toBeEnabled()
+
+  const gate = requestGate()
+  const refreshRequests: string[] = []
+  await page.route('**/api/**', async (route) => {
+    if (route.request().headers()['x-homedash-refresh'] === '1') {
+      refreshRequests.push(new URL(route.request().url()).pathname)
+      await gate.promise
+    }
+    await route.fallback()
+  })
+
+  await idleRefresh.click()
+  const busyRefresh = page.getByRole('button', {
+    name: 'Refreshing 0 of 4 sources; saved readings remain visible',
+  })
+  await expect(busyRefresh).toBeFocused()
+  await expect(busyRefresh).toHaveAttribute('aria-busy', 'true')
+  await expect(busyRefresh).toHaveAttribute('aria-disabled', 'true')
+  await expect
+    .poll(() => refreshRequests.sort())
+    .toEqual(['/api/bookmarks', '/api/ebird/summary', '/api/llmdash/summary', '/api/weather'])
+
+  const bounds = await busyRefresh.boundingBox()
+  expect(bounds).not.toBeNull()
+  await page.mouse.click(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2)
+  await page.keyboard.press('Enter')
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      }),
+  )
+  expect(refreshRequests).toHaveLength(4)
+  await expect(busyRefresh).toBeFocused()
+
+  gate.release()
+  await expect(idleRefresh).toBeEnabled()
+  await expect(idleRefresh).toHaveAttribute('aria-busy', 'false')
+  await expect(idleRefresh).toHaveAttribute('aria-disabled', 'false')
+  await expect(idleRefresh).toBeFocused()
+})
+
 test('Kagi query stays ephemeral, trims on submit, and focus is not reclaimed', async ({
   page,
 }) => {
@@ -402,13 +618,44 @@ test('Kagi query stays ephemeral, trims on submit, and focus is not reclaimed', 
   await query.fill('   ')
   await query.press('Enter')
   await expect(query).toHaveValue('')
-  await expect(page.getByRole('status')).toContainText('Enter a search before going to Kagi.')
+  await expect(page.getByText('Enter a search before going to Kagi.')).toBeVisible()
   expect(await page.evaluate(() => localStorage.getItem('kagi') ?? '')).toBe('')
 })
 
-test('source retry controls keep their mobile touch baseline', async ({ page }, testInfo) => {
+test('named mobile controls keep a 44 by 44 touch baseline', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'Mobile touch-target coverage')
 
+  const expectTouchTarget = async (label: string, locator: ReturnType<typeof page.getByRole>) => {
+    const bounds = await locator.evaluate((element) => {
+      const rectangle = element.getBoundingClientRect()
+      return { width: rectangle.width, height: rectangle.height }
+    })
+    expect(bounds.width, `${label} width`).toBeGreaterThanOrEqual(44)
+    expect(bounds.height, `${label} height`).toBeGreaterThanOrEqual(44)
+  }
+
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
+
+  for (const name of [
+    'Use Dawn display mode',
+    'Use Dense display mode',
+    'System',
+    'Light',
+    'Dark',
+  ]) {
+    await expectTouchTarget(name, page.getByRole('radio', { name, exact: true }))
+  }
+  for (const name of bookmarkNames) {
+    await expectTouchTarget(name, page.getByRole('link', { name, exact: true }))
+  }
+
+  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  for (const name of [/Lifers/, /Photo/, /Audio/]) {
+    await expectTouchTarget(String(name), page.getByRole('radio', { name }))
+  }
+
+  await page.evaluate(() => localStorage.removeItem('homedash.cache.bookmarks.v1'))
   await page.route('**/api/bookmarks', async (route) => {
     await route.fulfill({
       status: 503,
@@ -416,11 +663,9 @@ test('source retry controls keep their mobile touch baseline', async ({ page }, 
       body: JSON.stringify({ message: 'Bookmark configuration is temporarily unavailable.' }),
     })
   })
-  await page.goto('/')
+  await page.reload()
 
   const retry = page.getByRole('button', { name: 'Try again' })
   await expect(retry).toBeVisible()
-  expect(
-    await retry.evaluate((element) => element.getBoundingClientRect().height),
-  ).toBeGreaterThanOrEqual(40)
+  await expectTouchTarget('Empty bookmarks retry', retry)
 })

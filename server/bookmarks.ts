@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { z } from 'zod'
-import type { BookmarksEnvelope } from '../src/shared/contracts.js'
+import { bookmarkUrlSchema, type BookmarksEnvelope } from '../src/shared/contracts.js'
 import type { AppConfig } from './config.js'
 import { SourceError } from './errors.js'
 
 const entrySchema = z.object({
   name: z.string().trim().min(1).max(100),
-  url: z.url().refine((url) => url.startsWith('http://') || url.startsWith('https://')),
+  url: bookmarkUrlSchema,
   group: z.string().trim().min(1).max(40).default('Bookmarks'),
 })
 

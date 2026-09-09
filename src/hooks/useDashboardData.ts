@@ -5,6 +5,7 @@ import {
   ebirdEnvelopeSchema,
   llmdashEnvelopeSchema,
   weatherEnvelopeSchema,
+  type ApiMeta,
   type BookmarksEnvelope,
   type EbirdEnvelope,
   type LlmdashEnvelope,
@@ -13,9 +14,16 @@ import {
 } from '../shared/contracts'
 import { readEligibleLocation, readSnapshot, saveLocation, saveSnapshot } from '../lib/storage'
 
+export type RefreshStatus = 'refreshing' | 'idle' | 'failed'
+
 export type WidgetState<T> =
   | { status: 'loading'; data: null; message: null }
-  | { status: 'ready'; data: T; message: null }
+  | {
+      status: 'ready'
+      data: T
+      message: string | null
+      refreshStatus: RefreshStatus
+    }
   | { status: 'error'; data: null; message: string }
 
 export interface DashboardData {
@@ -25,13 +33,22 @@ export interface DashboardData {
   llmdash: WidgetState<LlmdashEnvelope>
 }
 
-type WidgetName = keyof DashboardData
+export type WidgetName = keyof DashboardData
 
 type SchemaByWidget = {
   weather: typeof weatherEnvelopeSchema
   bookmarks: typeof bookmarksEnvelopeSchema
   ebird: typeof ebirdEnvelopeSchema
   llmdash: typeof llmdashEnvelopeSchema
+}
+
+const widgetNames: WidgetName[] = ['weather', 'bookmarks', 'ebird', 'llmdash']
+
+const widgetLabels: Record<WidgetName, string> = {
+  weather: 'Weather',
+  bookmarks: 'Bookmarks',
+  ebird: 'eBird',
+  llmdash: 'llmdash',
 }
 
 const snapshotKeys: Record<WidgetName, string> = {
@@ -41,11 +58,53 @@ const snapshotKeys: Record<WidgetName, string> = {
   llmdash: 'homedash.cache.llmdash.v1',
 }
 
-const initialState: DashboardData = {
-  weather: { status: 'loading', data: null, message: null },
-  bookmarks: { status: 'loading', data: null, message: null },
-  ebird: { status: 'loading', data: null, message: null },
-  llmdash: { status: 'loading', data: null, message: null },
+const schemas: SchemaByWidget = {
+  weather: weatherEnvelopeSchema,
+  bookmarks: bookmarksEnvelopeSchema,
+  ebird: ebirdEnvelopeSchema,
+  llmdash: llmdashEnvelopeSchema,
+}
+
+function staleCopy<T extends { meta: ApiMeta }>(value: T, failureMessage?: string): T {
+  const refreshIssue = failureMessage
+    ? {
+        code: 'upstream-unavailable' as const,
+        message: failureMessage,
+        retryable: true,
+      }
+    : null
+  return {
+    ...value,
+    meta: {
+      ...value.meta,
+      freshness: 'stale',
+      issues: refreshIssue
+        ? [refreshIssue, ...value.meta.issues.filter((issue) => issue.message !== failureMessage)]
+        : value.meta.issues,
+    },
+  }
+}
+
+function hydratedWidget<K extends WidgetName>(name: K): DashboardData[K] {
+  const snapshot = readSnapshot(snapshotKeys[name], schemas[name] as z.ZodType)
+  if (!snapshot || typeof snapshot !== 'object' || !('meta' in snapshot)) {
+    return { status: 'loading', data: null, message: null } as DashboardData[K]
+  }
+  return {
+    status: 'ready',
+    data: staleCopy(snapshot as { meta: ApiMeta }),
+    message: null,
+    refreshStatus: 'refreshing',
+  } as DashboardData[K]
+}
+
+function hydrateDashboardData(): DashboardData {
+  return {
+    weather: hydratedWidget('weather'),
+    bookmarks: hydratedWidget('bookmarks'),
+    ebird: hydratedWidget('ebird'),
+    llmdash: hydratedWidget('llmdash'),
+  }
 }
 
 function currentPosition() {
@@ -71,17 +130,77 @@ async function errorMessage(response: Response, fallback: string) {
   }
 }
 
-export function useDashboardData() {
-  const [data, setData] = useState<DashboardData>(initialState)
+function remainingMessage(count: number) {
+  if (count === 0) return 'All refreshes finished.'
+  return `${count} ${count === 1 ? 'source is' : 'sources are'} still refreshing.`
+}
+
+export function useDashboardData(onAnnouncement?: (message: string) => void) {
+  const [data, setData] = useState<DashboardData>(hydrateDashboardData)
+  const [initialCachedCount] = useState(
+    () => widgetNames.filter((name) => data[name].status === 'ready').length,
+  )
+  const dataRef = useRef(data)
   const [selector, setSelector] = useState<LocationSelector | null>(null)
-  const [isRefreshing, setRefreshing] = useState(false)
+  const activeSourcesRef = useRef(new Set<WidgetName>(widgetNames))
+  const [activeSources, setActiveSources] = useState<WidgetName[]>(widgetNames)
   const [isLocating, setLocating] = useState(true)
   const [locationMessage, setLocationMessage] = useState('Requesting this device’s location…')
   const started = useRef(false)
 
-  const setWidget = useCallback(<K extends WidgetName>(name: K, value: DashboardData[K]) => {
-    setData((current) => ({ ...current, [name]: value }))
+  const updateData = useCallback((updater: (current: DashboardData) => DashboardData) => {
+    setData((current) => {
+      const next = updater(current)
+      dataRef.current = next
+      return next
+    })
   }, [])
+
+  const setWidget = useCallback(
+    <K extends WidgetName>(name: K, value: DashboardData[K]) => {
+      updateData((current) => ({ ...current, [name]: value }))
+    },
+    [updateData],
+  )
+
+  const beginSources = useCallback((names: WidgetName[]) => {
+    const next = new Set(activeSourcesRef.current)
+    names.forEach((name) => next.add(name))
+    activeSourcesRef.current = next
+    setActiveSources([...next])
+  }, [])
+
+  const settleSource = useCallback(
+    (name: WidgetName, outcome: 'updated' | 'failed-saved' | 'failed-empty') => {
+      const next = new Set(activeSourcesRef.current)
+      next.delete(name)
+      activeSourcesRef.current = next
+      setActiveSources([...next])
+      const label = widgetLabels[name]
+      const result =
+        outcome === 'updated'
+          ? `${label} updated.`
+          : outcome === 'failed-saved'
+            ? `${label} refresh failed. Its saved reading remains visible.`
+            : `${label} could not be loaded.`
+      onAnnouncement?.(`${result} ${remainingMessage(next.size)}`)
+    },
+    [onAnnouncement],
+  )
+
+  const markWidgetRefreshing = useCallback(
+    (name: WidgetName) => {
+      updateData((current) => {
+        const widget = current[name]
+        const next =
+          widget.status === 'ready'
+            ? { ...widget, message: null, refreshStatus: 'refreshing' as const }
+            : { status: 'loading' as const, data: null, message: null }
+        return { ...current, [name]: next }
+      })
+    },
+    [updateData],
+  )
 
   const load = useCallback(
     async <K extends WidgetName>(
@@ -91,7 +210,8 @@ export function useDashboardData() {
       init: RequestInit,
       force: boolean,
     ) => {
-      setWidget(name, { status: 'loading', data: null, message: null } as DashboardData[K])
+      beginSources([name])
+      markWidgetRefreshing(name)
       try {
         const response = await fetch(url, {
           ...init,
@@ -106,69 +226,81 @@ export function useDashboardData() {
         const parsed = (schema as z.ZodType).safeParse(await response.json())
         if (!parsed.success) throw new Error(`${name} returned an unreadable response.`)
         saveSnapshot(snapshotKeys[name], parsed.data)
-        setWidget(name, { status: 'ready', data: parsed.data, message: null } as DashboardData[K])
+        setWidget(name, {
+          status: 'ready',
+          data: parsed.data,
+          message: null,
+          refreshStatus: 'idle',
+        } as DashboardData[K])
+        settleSource(name, 'updated')
       } catch (error) {
-        const snapshot = readSnapshot(snapshotKeys[name], schema as z.ZodType)
+        const message = error instanceof Error ? error.message : `${name} could not be loaded.`
+        const current = dataRef.current[name]
+        const snapshot =
+          current.status === 'ready'
+            ? current.data
+            : readSnapshot(snapshotKeys[name], schema as z.ZodType)
         if (snapshot && typeof snapshot === 'object' && 'meta' in snapshot) {
-          const stale = {
-            ...snapshot,
-            meta: {
-              ...(snapshot as { meta: object }).meta,
-              freshness: 'stale',
-              issues: [
-                {
-                  code: 'upstream-unavailable',
-                  message: `Showing the last ${name} reading because refresh failed.`,
-                  retryable: true,
-                },
-              ],
-            },
-          }
-          setWidget(name, { status: 'ready', data: stale, message: null } as DashboardData[K])
+          setWidget(name, {
+            status: 'ready',
+            data: staleCopy(snapshot as { meta: ApiMeta }, message),
+            message,
+            refreshStatus: 'failed',
+          } as DashboardData[K])
+          settleSource(name, 'failed-saved')
           return
         }
         setWidget(name, {
           status: 'error',
           data: null,
-          message: error instanceof Error ? error.message : `${name} could not be loaded.`,
+          message,
         } as DashboardData[K])
+        settleSource(name, 'failed-empty')
       }
     },
-    [setWidget],
+    [beginSources, markWidgetRefreshing, setWidget, settleSource],
+  )
+
+  const loadLocationWidget = useCallback(
+    async (name: 'weather' | 'ebird', location: LocationSelector, force: boolean) => {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      if (name === 'weather') {
+        await load(
+          'weather',
+          '/api/weather',
+          weatherEnvelopeSchema,
+          { method: 'POST', body: JSON.stringify(location) },
+          force,
+        )
+        return
+      }
+      await load(
+        'ebird',
+        '/api/ebird/summary',
+        ebirdEnvelopeSchema,
+        { method: 'POST', body: JSON.stringify({ location, timeZone }) },
+        force,
+      )
+    },
+    [load],
   )
 
   const loadLocationSources = useCallback(
     async (location: LocationSelector, force: boolean) => {
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
       await Promise.allSettled([
-        load(
-          'weather',
-          '/api/weather',
-          weatherEnvelopeSchema,
-          {
-            method: 'POST',
-            body: JSON.stringify(location),
-          },
-          force,
-        ),
-        load(
-          'ebird',
-          '/api/ebird/summary',
-          ebirdEnvelopeSchema,
-          {
-            method: 'POST',
-            body: JSON.stringify({ location, timeZone }),
-          },
-          force,
-        ),
+        loadLocationWidget('weather', location, force),
+        loadLocationWidget('ebird', location, force),
       ])
     },
-    [load],
+    [loadLocationWidget],
   )
 
   const chooseLocation = useCallback(async () => {
     setLocating(true)
     setLocationMessage('Requesting this device’s location…')
+    beginSources(['weather', 'ebird'])
+    markWidgetRefreshing('weather')
+    markWidgetRefreshing('ebird')
     try {
       const position = await currentPosition()
       const capturedAt = new Date(position.timestamp || Date.now()).toISOString()
@@ -199,33 +331,61 @@ export function useDashboardData() {
     } finally {
       setLocating(false)
     }
-  }, [loadLocationSources])
+  }, [beginSources, loadLocationSources, markWidgetRefreshing])
 
   const refreshAll = useCallback(async () => {
-    setRefreshing(true)
+    beginSources(widgetNames)
+    onAnnouncement?.(
+      widgetNames.some((name) => dataRef.current[name].status === 'ready')
+        ? 'Showing saved readings while four sources refresh.'
+        : 'Refreshing all four dashboard sources.',
+    )
     await Promise.allSettled([
-      selector ? loadLocationSources(selector, true) : Promise.resolve(),
+      selector ? loadLocationSources(selector, true) : chooseLocation(),
       load('bookmarks', '/api/bookmarks', bookmarksEnvelopeSchema, {}, true),
       load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, true),
     ])
-    setRefreshing(false)
-  }, [load, loadLocationSources, selector])
+  }, [beginSources, chooseLocation, load, loadLocationSources, onAnnouncement, selector])
+
+  const retryWidget = useCallback(
+    async (name: WidgetName) => {
+      onAnnouncement?.(`${widgetLabels[name]} is refreshing; its saved reading remains visible.`)
+      if (name === 'weather' || name === 'ebird') {
+        await loadLocationWidget(name, selector ?? { kind: 'home' }, true)
+        return
+      }
+      if (name === 'bookmarks') {
+        await load('bookmarks', '/api/bookmarks', bookmarksEnvelopeSchema, {}, true)
+        return
+      }
+      await load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, true)
+    },
+    [load, loadLocationWidget, onAnnouncement, selector],
+  )
 
   useEffect(() => {
     if (started.current) return
     started.current = true
+    if (initialCachedCount) {
+      onAnnouncement?.('Showing saved readings while four sources refresh.')
+    }
     void load('bookmarks', '/api/bookmarks', bookmarksEnvelopeSchema, {}, false)
     void load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, false)
     void chooseLocation()
-  }, [chooseLocation, load])
+  }, [chooseLocation, initialCachedCount, load, onAnnouncement])
+
+  const visibleSourceCount = widgetNames.filter((name) => data[name].status === 'ready').length
 
   return {
     data,
     selector,
-    isRefreshing,
+    isRefreshing: activeSources.length > 0,
+    refreshProgress: widgetNames.length - activeSources.length,
+    visibleSourceCount,
     isLocating,
     locationMessage,
     retryLocation: chooseLocation,
+    retryWidget,
     refreshAll,
   }
 }

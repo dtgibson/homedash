@@ -709,6 +709,109 @@ a.target-item:hover strong {
   font-size: 9px;
 }
 
+/* Source-local freshness stays fixed while values refresh in place. */
+.source-freshness {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 20px;
+  margin: -5px 0 8px;
+  padding: 4px 0 5px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition:
+    color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dense-content > .source-freshness {
+  margin: 0 0 5px;
+}
+
+.freshness-icon {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+}
+
+.source-freshness[data-state='refreshing'] {
+  color: var(--gold);
+  border-bottom-color: color-mix(in srgb, var(--gold) 38%, var(--line));
+}
+
+.source-freshness[data-state='refreshing'] .freshness-icon {
+  border-top-color: transparent;
+  animation: turn 280ms linear infinite;
+}
+
+.source-freshness[data-state='fresh'] {
+  color: var(--green);
+}
+
+.source-freshness[data-state='fresh'] .freshness-icon {
+  background: currentcolor;
+}
+
+.source-freshness[data-state='failed'] {
+  color: var(--danger);
+  border-bottom-color: color-mix(in srgb, var(--danger) 42%, var(--line));
+}
+
+.source-freshness[data-state='failed'] .freshness-icon {
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+.source-freshness[data-state='stale'],
+.source-freshness[data-state='partial'] {
+  color: var(--gold);
+}
+
+.freshness-age {
+  color: var(--ink-faint);
+}
+
+.freshness-compact {
+  display: none;
+}
+
+.freshness-separator {
+  color: var(--line-strong);
+}
+
+.freshness-action {
+  flex: none;
+  font-weight: 600;
+}
+
+.freshness-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-soft);
+  text-overflow: ellipsis;
+}
+
+.freshness-retry {
+  min-height: 20px;
+  margin: -4px 0 -4px auto;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentcolor;
+  color: var(--danger);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
 @media (max-width: 900px) {
   .app-toolbar {
     justify-content: center;
@@ -825,6 +928,38 @@ a.target-item:hover strong {
     display: none;
   }
 
+  .source-freshness {
+    gap: 4px;
+    min-height: 16px;
+    margin: -2px 0 3px;
+    padding: 2px 0 3px;
+    font-size: 6.5px;
+  }
+
+  .dense-content > .source-freshness {
+    margin: 0 0 2px;
+  }
+
+  .freshness-icon {
+    width: 6px;
+    height: 6px;
+  }
+
+  .freshness-full,
+  .freshness-detail {
+    display: none;
+  }
+
+  .freshness-compact {
+    display: inline;
+  }
+
+  .freshness-retry {
+    min-width: 44px;
+    min-height: 44px;
+    margin: -14px 0 -14px auto;
+  }
+
   .dawn {
     padding: 7px 10px 8px;
   }
@@ -869,18 +1004,18 @@ a.target-item:hover strong {
 
   .dawn-composition {
     grid-template-columns: 1fr;
-    grid-template-rows: 113px minmax(232px, 1fr) 160px;
+    grid-template-rows: 126px minmax(257px, 1fr) 151px;
     height: calc(100% - 52px);
   }
 
   .story {
-    padding: 7px 0;
+    padding: 5px 0;
   }
 
   .weather-story {
     display: grid;
     grid-template-columns: 96px minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     gap: 0 9px;
     padding-bottom: 7px;
     border-bottom: 1px solid var(--line);
@@ -891,8 +1026,16 @@ a.target-item:hover strong {
     margin-bottom: 4px;
   }
 
+  .weather-story .source-freshness {
+    grid-column: 1 / -1;
+  }
+
+  .bird-story .source-freshness {
+    margin-bottom: 0;
+  }
+
   .story-heading h2 {
-    font-size: 17px;
+    font-size: 15px;
   }
 
   .location-line {
@@ -956,13 +1099,13 @@ a.target-item:hover strong {
   }
 
   .bird-story {
-    padding: 7px 0;
+    padding: 5px 0;
     border-bottom: 1px solid var(--line-strong);
     border-left: 0;
   }
 
   .bird-story .story-heading {
-    margin-bottom: 1px;
+    margin-bottom: 0;
   }
 
   .bird-story .story-heading .state-badge {
@@ -972,9 +1115,9 @@ a.target-item:hover strong {
   .month-comparison {
     grid-template-columns: 1fr auto;
     align-items: center;
-    height: 44px;
-    margin: 0 0 3px;
-    padding: 0 0 3px;
+    height: 38px;
+    margin: 1px 0 2px;
+    padding: 0 0 2px;
   }
 
   .month-number {
@@ -983,12 +1126,12 @@ a.target-item:hover strong {
   }
 
   .month-number strong {
-    font-size: 28px;
+    font-size: 25px;
   }
 
   .month-number span,
   .delta span {
-    font-size: 6.5px;
+    font-size: 6px;
   }
 
   .month-comparison .section-kicker {
@@ -1013,8 +1156,8 @@ a.target-item:hover strong {
   .bird-story > .section-kicker {
     max-width: 100%;
     overflow: hidden;
-    font-size: 6.5px;
-    letter-spacing: 0.05em;
+    font-size: 6px;
+    letter-spacing: 0.04em;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1023,13 +1166,18 @@ a.target-item:hover strong {
   .dense-target-controls {
     justify-content: space-between;
     gap: 8px;
-    margin: 3px 0 2px;
+    margin: 1px 0;
   }
 
   .target-tabs button,
   .dense-target-controls button {
     min-height: 44px;
     font-size: 7.5px;
+  }
+
+  .dense-target-controls button {
+    min-width: 44px;
+    font-size: 7px;
   }
 
   .target-item {
@@ -1055,7 +1203,7 @@ a.target-item:hover strong {
     grid-template-rows: 1fr;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    padding: 7px 0 0;
+    padding: 5px 0 0;
     border-top: 0;
     border-left: 0;
   }
@@ -1076,7 +1224,7 @@ a.target-item:hover strong {
   }
 
   .utility-section h2 {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .usage-story .utility-head {
@@ -1084,6 +1232,8 @@ a.target-item:hover strong {
   }
 
   .usage-story .source-launch {
+    min-height: 44px;
+    margin-block: -14px;
     font-size: 7px;
   }
 
@@ -1094,7 +1244,7 @@ a.target-item:hover strong {
   }
 
   .provider {
-    margin-top: 5px;
+    margin-top: 3px;
   }
 
   .provider-heading {
@@ -1109,7 +1259,7 @@ a.target-item:hover strong {
     grid-template-columns: 25px minmax(0, 1fr);
     grid-template-rows: auto 3px;
     gap: 1px 3px;
-    margin: 4px 0;
+    margin: 3px 0;
     font-size: 6.5px;
   }
 
@@ -1137,7 +1287,7 @@ a.target-item:hover strong {
   }
 
   .bookmark-group a {
-    min-height: 42px;
+    min-height: 44px;
     font-size: 8.5px;
     line-height: 1.1;
   }
@@ -1166,7 +1316,8 @@ a.target-item:hover strong {
   }
 
   .retry-link {
-    min-height: 40px;
+    min-width: 44px;
+    min-height: 44px;
     font-size: 7px;
   }
 
@@ -1179,13 +1330,13 @@ a.target-item:hover strong {
   }
 
   .dense-head {
-    height: 28px;
+    height: 20px;
     padding-bottom: 3px;
   }
 
   .dense-title {
-    display: grid;
-    gap: 2px;
+    display: flex;
+    gap: 8px;
   }
 
   .dense-title strong {
@@ -1197,13 +1348,13 @@ a.target-item:hover strong {
   }
 
   .dense-grid {
-    grid-template-rows: 86px minmax(339px, 1fr) 102px 120px;
-    height: calc(100% - 28px);
+    grid-template-rows: 95px minmax(327px, 1fr) 92px 131px;
+    height: calc(100% - 20px);
   }
 
   .dense-row {
     grid-template-columns: 1fr;
-    gap: 3px;
+    gap: 1px;
     padding: 2px 0;
   }
 
@@ -1217,15 +1368,15 @@ a.target-item:hover strong {
   }
 
   .dense-primary {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .dense-soft {
-    font-size: 8px;
+    font-size: 7px;
   }
 
   .dense-faint {
-    font-size: 7px;
+    font-size: 6px;
   }
 
   .dense-weather-row > .dense-content > .dense-wrap:first-child {
@@ -1236,8 +1387,8 @@ a.target-item:hover strong {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 2px;
-    margin-top: 3px;
-    font-size: 6.5px;
+    margin-top: 2px;
+    font-size: 6px;
     text-align: center;
   }
 
@@ -1249,12 +1400,12 @@ a.target-item:hover strong {
   }
 
   .dense-target-list .target-item strong {
-    font-size: 8px;
+    font-size: 7.5px;
   }
 
   .dense-target-list .target-item .where {
     grid-column: 1;
-    font-size: 7px;
+    font-size: 6.5px;
   }
 
   .dense-target-list .target-item time {
@@ -1263,26 +1414,26 @@ a.target-item:hover strong {
   }
 
   .dense-provider {
-    grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr);
     gap: 5px;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     padding: 0;
     border: 0;
   }
 
   .dense-provider-name {
-    font-size: 7px;
-  }
-
-  .dense-quota {
-    grid-template-columns: 16px 22px minmax(0, 1fr);
-    gap: 3px;
-    min-height: 0;
     font-size: 6.5px;
   }
 
+  .dense-quota {
+    grid-template-columns: 14px 21px minmax(0, 1fr);
+    gap: 3px;
+    min-height: 0;
+    font-size: 6px;
+  }
+
   .dense-quota strong {
-    font-size: 7px;
+    font-size: 6.5px;
   }
 
   .dense-quota > span:last-child {
@@ -1291,7 +1442,7 @@ a.target-item:hover strong {
 
   .dense-bookmarks {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2px 8px;
+    gap: 2px 7px;
   }
 
   .dense-bookmarks nav:nth-child(3) {
@@ -1301,13 +1452,25 @@ a.target-item:hover strong {
 
   .dense-bookmarks a {
     min-height: 44px;
-    font-size: 8px;
+    font-size: 7px;
   }
 
   .dense-bookmarks h3 {
     margin: 0;
     padding-bottom: 1px;
-    font-size: 6.5px;
+    font-size: 6px;
+  }
+
+  .dense-label .source-launch {
+    margin-block: -14px;
+  }
+
+  .dense-bookmarks-row {
+    padding-block: 1px;
+  }
+
+  .dense-bookmarks-row .source-freshness {
+    margin-bottom: 0;
   }
 
   .month-launch,
@@ -1318,6 +1481,7 @@ a.target-item:hover strong {
 
 @media (max-width: 360px) {
   .control-set button {
+    min-width: 44px;
     padding-inline: 4px;
     font-size: 7px;
   }

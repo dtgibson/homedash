@@ -2,6 +2,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { bookmarkUrlSchema } from '../src/shared/contracts'
 import { buildApp } from './app'
 import { loadConfig } from './config'
 
@@ -71,6 +72,46 @@ describe('Fastify application boundary', () => {
     ])
     expect(body.data.invalidEntryCount).toBe(1)
     expect(body.meta.issues[0].message).not.toContain('javascript')
+  })
+
+  it('applies the shared bookmark URL policy at the server boundary', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'homedash-bookmark-policy-'))
+    const bookmarksPath = path.join(dir, 'bookmarks.json')
+    const urls = [
+      'http://example.com',
+      'https://example.com/path?query=birds%20today#recent-sightings',
+      'HTTPS://Example.com/case-insensitive-scheme',
+      'javascript:alert(document.domain)',
+      'JaVaScRiPt:alert(document.domain)',
+      'javascript:https://example.com',
+      'data:text/html,<script>alert(1)</script>',
+      'file:///etc/passwd',
+      '//example.com/protocol-relative',
+      'not a URL',
+      'https://',
+      'httpsx://example.com',
+      'HtTpSx://example.com',
+      'https://user@example.com/private',
+      'https://:password@example.com/private',
+      'https://example.com@evil.invalid/private',
+    ]
+    await writeFile(
+      bookmarksPath,
+      JSON.stringify(
+        urls.map((url, index) => ({ group: 'Policy', name: `Candidate ${index}`, url })),
+      ),
+    )
+    const app = await buildApp({ config: testConfig(bookmarksPath), serveClient: false })
+    apps.push(app)
+
+    const response = await app.inject({ method: 'GET', url: '/api/bookmarks' })
+    expect(response.statusCode).toBe(200)
+    const body = response.json()
+    const expectedUrls = urls.filter((url) => bookmarkUrlSchema.safeParse(url).success)
+    expect(body.data.bookmarks.map((bookmark: { url: string }) => bookmark.url)).toEqual(
+      expectedUrls,
+    )
+    expect(body.data.invalidEntryCount).toBe(urls.length - expectedUrls.length)
   })
 
   it('copies llmdash remaining percentages and missing windows without re-deriving them', async () => {
