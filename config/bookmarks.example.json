@@ -1,7 +1,23 @@
-[
-  { "group": "Daily", "name": "Gmail", "url": "https://mail.google.com" },
-  { "group": "Daily", "name": "Calendar", "url": "https://calendar.google.com" },
-  { "group": "Projects", "name": "GitHub", "url": "https://github.com" },
-  { "group": "Birding", "name": "eBird", "url": "https://ebird.org" },
-  { "group": "Birding", "name": "Macaulay Library", "url": "https://macaulaylibrary.org" }
-]
+{
+  "schemaVersion": 1,
+  "sections": [
+    {
+      "name": "Daily",
+      "bookmarks": [
+        { "name": "Gmail", "url": "https://mail.google.com" },
+        { "name": "Calendar", "url": "https://calendar.google.com" }
+      ]
+    },
+    {
+      "name": "Projects",
+      "bookmarks": [{ "name": "GitHub", "url": "https://github.com" }]
+    },
+    {
+      "name": "Birding",
+      "bookmarks": [
+        { "name": "eBird", "url": "https://ebird.org" },
+        { "name": "Macaulay Library", "url": "https://macaulaylibrary.org" }
+      ]
+    }
+  ]
+}

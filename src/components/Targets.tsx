@@ -45,16 +45,32 @@ export function TargetList({
   if (!targets.length) return <p className="empty-copy">No qualifying nearby targets right now.</p>
   return (
     <div className={dense ? 'dense-target-list' : 'target-list'} aria-live="polite">
-      {targets.map((target) => (
-        <div className="target-item" key={target.speciesCode}>
-          <strong title={target.commonName}>{target.commonName}</strong>
-          <span className="distance">{formatDistance(target.distanceKm)}</span>
-          <span className="where" title={target.locality}>
-            {target.locality}
-          </span>
-          <time dateTime={target.observedAt}>{formatObserved(target.observedAt)}</time>
-        </div>
-      ))}
+      {targets.map((target) => {
+        const content = (
+          <>
+            <strong title={target.commonName}>{target.commonName}</strong>
+            <span className="distance">{formatDistance(target.distanceKm)}</span>
+            <span className="where" title={target.locality}>
+              {target.locality}
+            </span>
+            <time dateTime={target.observedAt}>{formatObserved(target.observedAt)}</time>
+          </>
+        )
+        return /^[a-z0-9]{3,24}$/.test(target.speciesCode) ? (
+          <a
+            className="target-item"
+            key={target.speciesCode}
+            href={`/launch/ebird/map/${encodeURIComponent(target.speciesCode)}`}
+            aria-label={`Open eBird map for ${target.commonName}`}
+          >
+            {content}
+          </a>
+        ) : (
+          <div className="target-item" key={target.speciesCode}>
+            {content}
+          </div>
+        )
+      })}
     </div>
   )
 }

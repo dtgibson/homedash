@@ -1,25 +1,27 @@
-import type { DashboardData } from '../hooks/useDashboardData'
-import { formatAge, signed } from '../lib/format'
+import type { DashboardData, WidgetName } from '../hooks/useDashboardData'
+import { formatAge, formatMiles, signed } from '../lib/format'
+import type { MoonPhaseLabel } from '../lib/moonPhase'
 import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DenseProvider } from './Quota'
 import { TargetList, TargetTabs } from './Targets'
-import { DenseWeather } from './Weather'
-import { ErrorState, LoadingState, StateNote } from './WidgetState'
+import { DenseDaylight, DenseWeather } from './Weather'
+import { ErrorState, LoadingState, SourceFreshness } from './WidgetState'
 
 interface DenseViewProps {
   data: DashboardData
+  moonPhase: MoonPhaseLabel | null
   category: TargetCategory
   onCategory: (category: TargetCategory) => void
-  onRetry: () => void
+  onRetry: (source: WidgetName) => void
 }
 
-export function DenseView({ data, category, onCategory, onRetry }: DenseViewProps) {
+export function DenseView({ data, moonPhase, category, onCategory, onRetry }: DenseViewProps) {
   const weather = data.weather.status === 'ready' ? data.weather.data : null
   const ebird = data.ebird.status === 'ready' ? data.ebird.data : null
   const llmdash = data.llmdash.status === 'ready' ? data.llmdash.data : null
   const bookmarks = data.bookmarks.status === 'ready' ? data.bookmarks.data : null
-  const liveSources = Object.values(data).filter((widget) => widget.status === 'ready').length
+  const visibleSources = Object.values(data).filter((widget) => widget.status === 'ready').length
   const now = new Date()
 
   return (
@@ -38,44 +40,77 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
             }).format(now)}
           </span>
         </div>
-        <span className="state-badge" data-state={liveSources === 4 ? 'fresh' : 'partial'}>
-          {liveSources} of 4 sources ready
+        <span className="state-badge" data-state={visibleSources === 4 ? 'fresh' : 'partial'}>
+          {visibleSources} of 4 sources visible
         </span>
       </header>
 
       <div className="dense-grid">
-        <section className="dense-row" aria-labelledby="dense-weather">
+        <section
+          className="dense-row dense-weather-row data-block"
+          data-source="weather"
+          data-refresh-state={
+            data.weather.status === 'ready' ? data.weather.refreshStatus : data.weather.status
+          }
+          aria-labelledby="dense-weather"
+          aria-busy={
+            data.weather.status === 'loading' ||
+            (data.weather.status === 'ready' && data.weather.refreshStatus === 'refreshing')
+          }
+        >
           <h2 className="dense-label" id="dense-weather">
             Weather
           </h2>
           <div className="dense-content">
+            <SourceFreshness source="weather" state={data.weather} onRetry={onRetry} />
             {data.weather.status === 'loading' && <LoadingState message="Reading weather…" />}
             {data.weather.status === 'error' && (
-              <ErrorState title="No weather." message={data.weather.message} onRetry={onRetry} />
+              <ErrorState
+                title="No weather."
+                message={data.weather.message}
+                onRetry={() => onRetry('weather')}
+              />
             )}
             {weather && <DenseWeather envelope={weather} />}
+            <DenseDaylight envelope={weather} moonPhase={moonPhase} />
           </div>
         </section>
 
-        <section className="dense-row" aria-labelledby="dense-ebird">
+        <section
+          className="dense-row dense-ebird-row data-block"
+          data-source="ebird"
+          data-refresh-state={
+            data.ebird.status === 'ready' ? data.ebird.refreshStatus : data.ebird.status
+          }
+          aria-labelledby="dense-ebird"
+          aria-busy={
+            data.ebird.status === 'loading' ||
+            (data.ebird.status === 'ready' && data.ebird.refreshStatus === 'refreshing')
+          }
+        >
           <h2 className="dense-label" id="dense-ebird">
             eBird
           </h2>
           <div className="dense-content">
+            <SourceFreshness source="ebird" state={data.ebird} onRetry={onRetry} />
             {data.ebird.status === 'loading' && <LoadingState message="Reading nearby targets…" />}
             {data.ebird.status === 'error' && (
               <ErrorState
                 title="No nearby targets."
                 message={data.ebird.message}
-                onRetry={onRetry}
+                onRetry={() => onRetry('ebird')}
               />
             )}
             {ebird && (
               <>
                 <div className="dense-wrap">
-                  <span className="dense-primary dense-green">
-                    {ebird.data.month.currentCount} species
-                  </span>
+                  <a
+                    className="dense-primary dense-green month-launch"
+                    href="/launch/ebird/my-ebird"
+                    aria-label={`Open My eBird for ${ebird.data.month.label} progress`}
+                  >
+                    {ebird.data.month.currentCount} species · My eBird
+                  </a>
                   <span className="dense-soft">
                     {ebird.data.month.label.toLowerCase()} 1–{ebird.data.month.throughDay}
                   </span>
@@ -84,7 +119,7 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
                   </span>
                   <span className="dense-faint">vs {ebird.data.month.previousCount} last year</span>
                   <span className="dense-faint">
-                    within {ebird.data.radiusKm} km · closest first
+                    within {formatMiles(ebird.data.radiusKm)} · closest first
                   </span>
                   <span className="dense-faint">
                     profile {formatAge(ebird.data.profileUpdatedAt)}
@@ -97,23 +132,36 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
                   onCategory={onCategory}
                 />
                 <TargetList dense targets={ebird.data.targets[category]} />
-                <StateNote meta={ebird.meta} />
               </>
             )}
           </div>
         </section>
 
-        <section className="dense-row" aria-labelledby="dense-llmdash">
+        <section
+          className="dense-row dense-llmdash-row data-block"
+          data-source="llmdash"
+          data-refresh-state={
+            data.llmdash.status === 'ready' ? data.llmdash.refreshStatus : data.llmdash.status
+          }
+          aria-labelledby="dense-llmdash"
+          aria-busy={
+            data.llmdash.status === 'loading' ||
+            (data.llmdash.status === 'ready' && data.llmdash.refreshStatus === 'refreshing')
+          }
+        >
           <h2 className="dense-label" id="dense-llmdash">
-            llmdash
+            <a className="source-launch" href="/launch/llmdash" aria-label="Open llmdash dashboard">
+              llmdash
+            </a>
           </h2>
           <div className="dense-content">
+            <SourceFreshness source="llmdash" state={data.llmdash} onRetry={onRetry} />
             {data.llmdash.status === 'loading' && <LoadingState message="Reading coding runway…" />}
             {data.llmdash.status === 'error' && (
               <ErrorState
                 title="No coding runway."
                 message={data.llmdash.message}
-                onRetry={onRetry}
+                onRetry={() => onRetry('llmdash')}
               />
             )}
             {llmdash && (
@@ -121,29 +169,43 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
                 {llmdash.data.providers.map((provider) => (
                   <DenseProvider provider={provider} key={provider.id} />
                 ))}
-                <StateNote meta={llmdash.meta} />
               </>
             )}
           </div>
         </section>
 
-        <section className="dense-row" aria-labelledby="dense-bookmarks">
+        <section
+          className="dense-row dense-bookmarks-row data-block"
+          data-source="bookmarks"
+          data-refresh-state={
+            data.bookmarks.status === 'ready' ? data.bookmarks.refreshStatus : data.bookmarks.status
+          }
+          aria-labelledby="dense-bookmarks"
+          aria-busy={
+            data.bookmarks.status === 'loading' ||
+            (data.bookmarks.status === 'ready' && data.bookmarks.refreshStatus === 'refreshing')
+          }
+        >
           <h2 className="dense-label" id="dense-bookmarks">
             Bookmarks
           </h2>
           <div className="dense-content">
+            <SourceFreshness source="bookmarks" state={data.bookmarks} onRetry={onRetry} />
             {data.bookmarks.status === 'loading' && <LoadingState message="Reading bookmarks…" />}
             {data.bookmarks.status === 'error' && (
               <ErrorState
                 title="No bookmarks."
                 message={data.bookmarks.message}
-                onRetry={onRetry}
+                onRetry={() => onRetry('bookmarks')}
               />
             )}
             {bookmarks && (
               <>
-                <BookmarkGroups dense bookmarks={bookmarks.data.bookmarks} />
-                <StateNote meta={bookmarks.meta} />
+                <BookmarkGroups
+                  dense
+                  bookmarks={bookmarks.data.bookmarks}
+                  sections={bookmarks.data.sections}
+                />
               </>
             )}
           </div>

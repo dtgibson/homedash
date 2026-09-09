@@ -1,5 +1,14 @@
 import type { ReactNode } from 'react'
+import type { WidgetName, WidgetState as DashboardWidgetState } from '../hooks/useDashboardData'
+import { formatAge, formatTime } from '../lib/format'
 import type { ApiMeta } from '../shared/contracts'
+
+const sourceLabels: Record<WidgetName, string> = {
+  weather: 'weather',
+  bookmarks: 'bookmarks',
+  ebird: 'eBird',
+  llmdash: 'llmdash',
+}
 
 export function LoadingState({ message }: { message: string }) {
   return (
@@ -28,6 +37,79 @@ export function ErrorState({
       <button className="retry-link" type="button" onClick={onRetry}>
         Try again
       </button>
+    </div>
+  )
+}
+
+function compactAge(value: string | null) {
+  return formatAge(value).replace(' ago', ' old').replace('unknown age', 'age unknown')
+}
+
+export function SourceFreshness<T extends { meta: ApiMeta }>({
+  source,
+  state,
+  onRetry,
+}: {
+  source: WidgetName
+  state: DashboardWidgetState<T>
+  onRetry: (source: WidgetName) => void
+}) {
+  if (state.status !== 'ready') return null
+  const timestamp = state.data.meta.sourceUpdatedAt ?? state.data.meta.generatedAt
+  const age = formatAge(timestamp)
+  const fullAge =
+    age === 'just now' ? 'Updated just now' : `Updated ${formatTime(timestamp)} · ${age}`
+  const sourceState =
+    state.refreshStatus === 'refreshing'
+      ? 'refreshing'
+      : state.refreshStatus === 'failed'
+        ? 'failed'
+        : state.data.meta.freshness === 'stale'
+          ? 'stale'
+          : state.data.meta.issues.length
+            ? 'partial'
+            : 'fresh'
+  const action =
+    sourceState === 'refreshing'
+      ? 'Refreshing'
+      : sourceState === 'failed'
+        ? 'Refresh failed'
+        : sourceState === 'stale'
+          ? 'Source is stale'
+          : sourceState === 'partial'
+            ? 'Partially updated'
+            : 'Up to date'
+  const failureDetail = sourceState === 'failed' ? 'Saved reading remains.' : ''
+
+  return (
+    <div
+      className="source-freshness"
+      data-state={sourceState}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      aria-label={`${fullAge}. ${action}.${failureDetail ? ` ${failureDetail}` : ''}`}
+    >
+      <span className="freshness-icon" aria-hidden="true" />
+      <span className="freshness-age">
+        <span className="freshness-full">{fullAge}</span>
+        <span className="freshness-compact">{compactAge(timestamp)}</span>
+      </span>
+      <span className="freshness-separator" aria-hidden="true">
+        ·
+      </span>
+      <span className="freshness-action">{action}</span>
+      {failureDetail && <span className="freshness-detail">{failureDetail}</span>}
+      {sourceState === 'failed' && (
+        <button
+          className="freshness-retry"
+          type="button"
+          onClick={() => onRetry(source)}
+          aria-label={`Try ${sourceLabels[source]} again`}
+        >
+          Try again
+        </button>
+      )}
     </div>
   )
 }
