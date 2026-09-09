@@ -91,5 +91,6 @@ else
   install_checkout
 fi
 
-LLMDASH_URL="${LLMDASH_URL:-http://hephaestus-developer:8787}" \
+LLMDASH_URL="${LLMDASH_URL:-http://127.0.0.1:8787}" \
+  LLMDASH_LAUNCH_URL="${LLMDASH_LAUNCH_URL:-}" \
   "$HOMEDASH_DIR/scripts/install-or-update.sh"

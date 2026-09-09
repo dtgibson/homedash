@@ -33,8 +33,19 @@ export function formatAge(value: string | null, now = Date.now()) {
   return `${Math.floor(elapsed / 86_400_000)}d ago`
 }
 
+const MILES_PER_KILOMETER = 0.621371
+
+export function kilometersToMiles(value: number) {
+  return value * MILES_PER_KILOMETER
+}
+
+export function formatMiles(value: number) {
+  const miles = kilometersToMiles(value)
+  return `${miles < 10 - 1e-9 ? miles.toFixed(1) : Math.round(miles)} mi`
+}
+
 export function formatDistance(value: number | null) {
-  return value == null ? 'distance unknown' : `${value.toFixed(value < 10 ? 1 : 0)} km`
+  return value == null ? 'distance unknown' : formatMiles(value)
 }
 
 export function formatObserved(value: string) {

@@ -6,12 +6,35 @@ const optionalCoordinate = z.preprocess(
   z.coerce.number().optional(),
 )
 
+type LlmdashLaunchDestination =
+  { status: 'ready'; url: URL } | { status: 'unavailable'; reason: 'missing' | 'invalid' }
+
+function parseLlmdashLaunchDestination(value: string | undefined): LlmdashLaunchDestination {
+  if (value == null || value.trim() === '') return { status: 'unavailable', reason: 'missing' }
+  try {
+    const url = new URL(value)
+    if (
+      (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+      !url.hostname ||
+      url.username ||
+      url.password ||
+      url.hash
+    ) {
+      return { status: 'unavailable', reason: 'invalid' }
+    }
+    return { status: 'ready', url }
+  } catch {
+    return { status: 'unavailable', reason: 'invalid' }
+  }
+}
+
 const envSchema = z
   .object({
     HOMEDASH_HOST: z.string().default('127.0.0.1'),
     HOMEDASH_PORT: z.coerce.number().int().min(1).max(65_535).default(1910),
     SNOWRAVEN_URL: z.url().default('http://127.0.0.1:1620'),
     LLMDASH_URL: z.url().default('http://127.0.0.1:8787'),
+    LLMDASH_LAUNCH_URL: z.string().optional(),
     HOME_LATITUDE: optionalCoordinate,
     HOME_LONGITUDE: optionalCoordinate,
     HOME_LABEL: z.string().min(1).max(100).default('Home'),
@@ -49,6 +72,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
     port: value.HOMEDASH_PORT,
     snowRavenUrl: value.SNOWRAVEN_URL.replace(/\/$/, ''),
     llmdashUrl: value.LLMDASH_URL.replace(/\/$/, ''),
+    llmdashLaunch: parseLlmdashLaunchDestination(value.LLMDASH_LAUNCH_URL),
     home:
       value.HOME_LATITUDE == null || value.HOME_LONGITUDE == null
         ? null

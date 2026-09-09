@@ -1,4 +1,5 @@
 import * as ToggleGroup from '@radix-ui/react-toggle-group'
+import { useEffect, useRef, type FormEvent } from 'react'
 import type { DevicePreferences } from '../shared/contracts'
 
 function LocationIcon() {
@@ -24,6 +25,7 @@ interface ToolbarProps {
   onPreferences: (preferences: DevicePreferences) => void
   onLocation: () => void
   onRefresh: () => void
+  onStatus: (message: string) => void
   locating: boolean
   refreshing: boolean
 }
@@ -33,15 +35,66 @@ export function Toolbar({
   onPreferences,
   onLocation,
   onRefresh,
+  onStatus,
   locating,
   refreshing,
 }: ToolbarProps) {
+  const queryRef = useRef<HTMLInputElement>(null)
+  const hasFocusedSearch = useRef(false)
+
+  useEffect(() => {
+    if (hasFocusedSearch.current) return
+    hasFocusedSearch.current = true
+    queryRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    const query = queryRef.current
+    if (!query) return
+    const trimmed = query.value.trim()
+    if (!trimmed) {
+      event.preventDefault()
+      query.value = ''
+      onStatus('Enter a search before going to Kagi.')
+      return
+    }
+    query.value = trimmed
+  }
+
   return (
     <header className="app-toolbar" aria-label="Dashboard preferences">
       <div className="wordmark">
         <span className="wordmark-mark" aria-hidden="true" />
         homedash
       </div>
+      <form
+        className="kagi-form"
+        action="https://kagi.com/search"
+        method="get"
+        role="search"
+        aria-label="Kagi web search"
+        onSubmit={submitSearch}
+      >
+        <label className="kagi-label" htmlFor="kagi-query">
+          Kagi
+        </label>
+        <input
+          ref={queryRef}
+          id="kagi-query"
+          name="q"
+          type="search"
+          inputMode="search"
+          autoComplete="off"
+          placeholder="Search the web"
+          aria-describedby="kagi-hint"
+        />
+        <span id="kagi-hint" hidden>
+          Enter a non-empty query and press Enter, or use the search button.
+        </span>
+        <button type="submit" aria-label="Search with Kagi">
+          <span aria-hidden="true">→</span>
+        </button>
+      </form>
       <div className="toolbar-controls">
         <ToggleGroup.Root
           className="control-set"

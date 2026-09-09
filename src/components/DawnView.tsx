@@ -1,5 +1,5 @@
 import type { DashboardData } from '../hooks/useDashboardData'
-import { formatAge, signed } from '../lib/format'
+import { formatAge, formatMiles, signed } from '../lib/format'
 import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DawnProvider } from './Quota'
@@ -96,7 +96,11 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
           )}
           {ebird && (
             <>
-              <div className="month-comparison">
+              <a
+                className="month-comparison"
+                href="/launch/ebird/my-ebird"
+                aria-label={`Open My eBird for ${ebird.data.month.label} progress`}
+              >
                 <div>
                   <p className="section-kicker">
                     {ebird.data.month.label} · {ebird.data.month.throughDay} days
@@ -113,10 +117,11 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
                 <div className="delta">
                   <strong>{signed(ebird.data.month.difference)}</strong>
                   <span>vs {ebird.data.month.previousCount} last year</span>
+                  <span className="month-action">My eBird ↗</span>
                 </div>
-              </div>
+              </a>
               <p className="section-kicker">
-                Top nearby targets · within {ebird.data.radiusKm} km · closest first
+                Top nearby targets · within {formatMiles(ebird.data.radiusKm)} · closest first
               </p>
               <TargetTabs category={category} summary={ebird.data} onCategory={onCategory} />
               <TargetList targets={ebird.data.targets[category]} />
@@ -132,9 +137,13 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
           >
             <div className="usage-intro utility-head">
               <h2 id="usage-heading">Coding runway</h2>
-              <span className="meta">
+              <a
+                className="source-launch"
+                href="/launch/llmdash"
+                aria-label="Open llmdash dashboard"
+              >
                 llmdash{llmdash ? ` · ${formatAge(llmdash.meta.sourceUpdatedAt)}` : ''}
-              </span>
+              </a>
             </div>
             <p className="utility-copy">
               Authoritative remaining headroom from llmdash. Missing windows stay unfilled.

@@ -49,6 +49,7 @@ export default function App() {
         }}
         onLocation={() => void retryLocation()}
         onRefresh={() => void retryAll()}
+        onStatus={announce}
         locating={dashboard.isLocating}
         refreshing={dashboard.isRefreshing}
       />

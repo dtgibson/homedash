@@ -231,6 +231,23 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   await expect(page.getByRole('heading', { name: 'Birding pulse' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Coding runway' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Places to go' })).toBeVisible()
+  await expect(page.getByRole('searchbox', { name: 'Kagi' })).toBeFocused()
+  await expect(page.getByRole('search', { name: 'Kagi web search' })).toHaveAttribute(
+    'action',
+    'https://kagi.com/search',
+  )
+  await expect(
+    page.getByRole('link', { name: 'Open My eBird for September progress' }),
+  ).toHaveAttribute('href', '/launch/ebird/my-ebird')
+  await expect(
+    page.getByRole('link', { name: 'Open eBird map for American Redstart' }),
+  ).toHaveAttribute('href', '/launch/ebird/map/amered')
+  await expect(page.getByRole('link', { name: 'Open llmdash dashboard' })).toHaveAttribute(
+    'href',
+    '/launch/llmdash',
+  )
+  await expect(page.getByText('within 31 mi · closest first')).toBeVisible()
+  await expect(page.getByText('1.3 mi')).toBeVisible()
   for (const name of [...targetNames, ...bookmarkNames]) {
     await expect(page.locator('main')).toContainText(name)
   }
@@ -297,6 +314,16 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   }
   await expect(page.getByText('58°').first()).toBeVisible()
   await expect(page.getByText('daylight 12h 49m')).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'Open My eBird for September progress' }),
+  ).toHaveAttribute('href', '/launch/ebird/my-ebird')
+  await expect(
+    page.getByRole('link', { name: 'Open eBird map for American Redstart' }),
+  ).toHaveAttribute('href', '/launch/ebird/map/amered')
+  await expect(page.getByRole('link', { name: 'Open llmdash dashboard' })).toHaveAttribute(
+    'href',
+    '/launch/llmdash',
+  )
 
   await page.getByRole('radio', { name: 'Dark' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark')
@@ -350,6 +377,33 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
     path: testInfo.outputPath(`${testInfo.project.name}-dense.png`),
     fullPage: true,
   })
+})
+
+test('Kagi query stays ephemeral, trims on submit, and focus is not reclaimed', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const query = page.getByRole('searchbox', { name: 'Kagi' })
+  await expect(query).toBeFocused()
+  await query.fill('  sandhill crane  ')
+  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await expect(query).toHaveValue('  sandhill crane  ')
+  await expect(page.getByRole('search')).toHaveCount(1)
+  await expect(page.getByRole('radio', { name: 'Use Dense display mode' })).toBeFocused()
+
+  await page.evaluate(() => {
+    document
+      .querySelector<HTMLFormElement>('.kagi-form')
+      ?.addEventListener('submit', (event) => event.preventDefault(), { once: true })
+  })
+  await query.press('Enter')
+  await expect(query).toHaveValue('sandhill crane')
+
+  await query.fill('   ')
+  await query.press('Enter')
+  await expect(query).toHaveValue('')
+  await expect(page.getByRole('status')).toContainText('Enter a search before going to Kagi.')
+  expect(await page.evaluate(() => localStorage.getItem('kagi') ?? '')).toBe('')
 })
 
 test('source retry controls keep their mobile touch baseline', async ({ page }, testInfo) => {

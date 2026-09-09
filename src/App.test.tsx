@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -177,5 +177,69 @@ describe('one store with two renderers', () => {
     expect(JSON.parse(localStorage.getItem('homedash.preferences.v1') ?? '{}').appearance).toBe(
       'dark',
     )
+  })
+
+  it('keeps one ephemeral Kagi form across renderers and focuses it only on mount', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const query = screen.getByRole('searchbox', { name: 'Kagi' })
+    const form = screen.getByRole('search', { name: 'Kagi web search' })
+
+    expect(query).toHaveFocus()
+    expect(form).toHaveAttribute('action', 'https://kagi.com/search')
+    expect(form).toHaveAttribute('method', 'get')
+    expect(query).toHaveAttribute('name', 'q')
+    expect(screen.getByRole('button', { name: 'Search with Kagi' })).toHaveAttribute(
+      'type',
+      'submit',
+    )
+
+    await user.type(query, '  sandhill crane  ')
+    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
+    expect(screen.getAllByRole('search')).toHaveLength(1)
+    expect(query).toHaveValue('  sandhill crane  ')
+    expect(query).not.toHaveFocus()
+
+    form.addEventListener('submit', (event) => event.preventDefault(), { once: true })
+    fireEvent.submit(form)
+    expect(query).toHaveValue('sandhill crane')
+    expect(query).not.toHaveFocus()
+  })
+
+  it('prevents and announces a blank Kagi submission', async () => {
+    render(<App />)
+    const query = screen.getByRole('searchbox', { name: 'Kagi' })
+    fireEvent.change(query, { target: { value: '   ' } })
+    const event = new Event('submit', { bubbles: true, cancelable: true })
+
+    expect(fireEvent(screen.getByRole('search'), event)).toBe(false)
+    expect(query).toHaveValue('')
+    expect(screen.getByRole('status')).toHaveTextContent('Enter a search before going to Kagi.')
+  })
+
+  it('exposes equivalent fixed launch links and miles in Dawn and Dense', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const expectLaunches = () => {
+      expect(
+        screen.getByRole('link', { name: 'Open My eBird for September progress' }),
+      ).toHaveAttribute('href', '/launch/ebird/my-ebird')
+      expect(screen.getByRole('link', { name: 'Open eBird map for Ruff' })).toHaveAttribute(
+        'href',
+        '/launch/ebird/map/ruff',
+      )
+      expect(screen.getByRole('link', { name: 'Open llmdash dashboard' })).toHaveAttribute(
+        'href',
+        '/launch/llmdash',
+      )
+      expect(screen.getByText('1.5 mi')).toBeVisible()
+      expect(screen.getByText(/within 31 mi · closest first/i)).toBeVisible()
+    }
+
+    expectLaunches()
+    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
+    expectLaunches()
+    expect(screen.queryByText(/\bkm\b/i)).not.toBeInTheDocument()
   })
 })

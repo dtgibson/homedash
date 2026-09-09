@@ -1,5 +1,5 @@
 import type { DashboardData } from '../hooks/useDashboardData'
-import { formatAge, signed } from '../lib/format'
+import { formatAge, formatMiles, signed } from '../lib/format'
 import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DenseProvider } from './Quota'
@@ -44,7 +44,7 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
       </header>
 
       <div className="dense-grid">
-        <section className="dense-row" aria-labelledby="dense-weather">
+        <section className="dense-row dense-weather-row" aria-labelledby="dense-weather">
           <h2 className="dense-label" id="dense-weather">
             Weather
           </h2>
@@ -57,7 +57,7 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
           </div>
         </section>
 
-        <section className="dense-row" aria-labelledby="dense-ebird">
+        <section className="dense-row dense-ebird-row" aria-labelledby="dense-ebird">
           <h2 className="dense-label" id="dense-ebird">
             eBird
           </h2>
@@ -73,9 +73,13 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
             {ebird && (
               <>
                 <div className="dense-wrap">
-                  <span className="dense-primary dense-green">
-                    {ebird.data.month.currentCount} species
-                  </span>
+                  <a
+                    className="dense-primary dense-green month-launch"
+                    href="/launch/ebird/my-ebird"
+                    aria-label={`Open My eBird for ${ebird.data.month.label} progress`}
+                  >
+                    {ebird.data.month.currentCount} species · My eBird
+                  </a>
                   <span className="dense-soft">
                     {ebird.data.month.label.toLowerCase()} 1–{ebird.data.month.throughDay}
                   </span>
@@ -84,7 +88,7 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
                   </span>
                   <span className="dense-faint">vs {ebird.data.month.previousCount} last year</span>
                   <span className="dense-faint">
-                    within {ebird.data.radiusKm} km · closest first
+                    within {formatMiles(ebird.data.radiusKm)} · closest first
                   </span>
                   <span className="dense-faint">
                     profile {formatAge(ebird.data.profileUpdatedAt)}
@@ -103,9 +107,11 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
           </div>
         </section>
 
-        <section className="dense-row" aria-labelledby="dense-llmdash">
+        <section className="dense-row dense-llmdash-row" aria-labelledby="dense-llmdash">
           <h2 className="dense-label" id="dense-llmdash">
-            llmdash
+            <a className="source-launch" href="/launch/llmdash" aria-label="Open llmdash dashboard">
+              llmdash
+            </a>
           </h2>
           <div className="dense-content">
             {data.llmdash.status === 'loading' && <LoadingState message="Reading coding runway…" />}
@@ -127,7 +133,7 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
           </div>
         </section>
 
-        <section className="dense-row" aria-labelledby="dense-bookmarks">
+        <section className="dense-row dense-bookmarks-row" aria-labelledby="dense-bookmarks">
           <h2 className="dense-label" id="dense-bookmarks">
             Bookmarks
           </h2>
