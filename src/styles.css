@@ -498,6 +498,40 @@ a:hover {
   text-transform: uppercase;
 }
 
+.daylight-context {
+  min-width: 0;
+  align-self: end;
+}
+
+.moon-phase {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  margin: 5px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  letter-spacing: 0.035em;
+  text-align: center;
+}
+
+.moon-phase-prefix {
+  color: var(--ink-soft);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.moon-phase-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .dawn-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -1056,6 +1090,18 @@ a:hover {
 
 .dense-forecast {
   margin-top: 10px;
+}
+
+.dense-daylight-line {
+  margin-top: 5px;
+  color: var(--ink-faint);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.dense-phase {
+  color: var(--ink-soft);
+  font-weight: 500;
 }
 
 .dense-hour {

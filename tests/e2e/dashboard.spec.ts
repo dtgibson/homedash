@@ -669,3 +669,208 @@ test('named mobile controls keep a 44 by 44 touch baseline', async ({ page }, te
   await expect(retry).toBeVisible()
   await expectTouchTarget('Empty bookmarks retry', retry)
 })
+
+test('moon phase is shared across the release viewport, mode, and appearance matrix without new requests', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2024-04-19T12:00:00.000Z'))
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' })
+  const apiRequests: string[] = []
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (path.startsWith('/api/')) apiRequests.push(path)
+  })
+
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
+
+  const assertPhaseAndFit = async (mode: 'dawn' | 'dense') => {
+    await expect(page.getByText('Waxing gibbous', { exact: true })).toBeVisible()
+    const phaseSelector = mode === 'dawn' ? '.moon-phase-prefix' : '.dense-phase'
+    await expect(page.locator(mode === 'dawn' ? '.moon-phase' : '.dense-phase')).toContainText(
+      mode === 'dawn' ? 'Moon·Waxing gibbous' : 'moon · Waxing gibbous',
+    )
+    const expectedInkSoft = await page.evaluate(() => {
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--ink-soft)'
+      document.body.append(probe)
+      const color = getComputedStyle(probe).color
+      probe.remove()
+      return color
+    })
+    await expect(page.locator(phaseSelector)).toHaveCSS('color', expectedInkSoft)
+    const fit = await page.evaluate((activeMode) => {
+      const parseColor = (value: string) => {
+        const color = value.trim()
+        if (/^#[\da-f]{6}$/i.test(color)) {
+          return [1, 3, 5].map((offset) => Number.parseInt(color.slice(offset, offset + 2), 16))
+        }
+        const channels =
+          color
+            .match(/[\d.]+/g)
+            ?.slice(0, 3)
+            .map(Number) ?? []
+        return color.startsWith('color(srgb') ? channels.map((channel) => channel * 255) : channels
+      }
+      const luminance = (rgb: number[]) => {
+        const [red, green, blue] = rgb.map((channel) => {
+          const value = channel / 255
+          return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+      }
+      const contrast = (foreground: number[], background: number[]) => {
+        const light = Math.max(luminance(foreground), luminance(background))
+        const dark = Math.min(luminance(foreground), luminance(background))
+        return (light + 0.05) / (dark + 0.05)
+      }
+      const rootStyle = getComputedStyle(document.documentElement)
+      const foregroundColor = getComputedStyle(
+        document.querySelector<HTMLElement>(
+          activeMode === 'dawn' ? '.moon-phase-prefix' : '.dense-phase',
+        )!,
+      ).color
+      const backgroundColors = ['--ground', '--ground-deep'].map((token) =>
+        rootStyle.getPropertyValue(token),
+      )
+      const foreground = parseColor(foregroundColor)
+      const phaseContrast = backgroundColors.map((background) =>
+        contrast(foreground, parseColor(background)),
+      )
+
+      return {
+        documentWidth: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        documentHeight:
+          document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+        clippedRegions: [
+          ...document.querySelectorAll<HTMLElement>('.story, .utility-section, .dense-row'),
+        ]
+          .filter(
+            (element) =>
+              element.scrollWidth > element.clientWidth + 1 ||
+              element.scrollHeight > element.clientHeight + 1,
+          )
+          .map((element) => element.className),
+        phaseClipped: [...document.querySelectorAll<HTMLElement>('.moon-phase-label')].some(
+          (element) =>
+            element.scrollWidth > element.clientWidth + 1 ||
+            element.scrollHeight > element.clientHeight + 1,
+        ),
+        minimumPhaseContrast: Math.min(...phaseContrast),
+        phaseColors: {
+          foreground: foregroundColor,
+          inkSoft: rootStyle.getPropertyValue('--ink-soft'),
+          backgrounds: backgroundColors,
+        },
+      }
+    }, mode)
+    const { minimumPhaseContrast, phaseColors, ...layout } = fit
+    expect(minimumPhaseContrast, JSON.stringify(phaseColors)).toBeGreaterThanOrEqual(4.5)
+    expect(layout).toEqual({
+      documentWidth: true,
+      documentHeight: true,
+      clippedRegions: [],
+      phaseClipped: false,
+    })
+  }
+
+  const setMode = async (mode: 'dawn' | 'dense') => {
+    await page
+      .getByRole('radio', {
+        name: mode === 'dawn' ? 'Use Dawn display mode' : 'Use Dense display mode',
+      })
+      .click()
+    await assertPhaseAndFit(mode)
+  }
+
+  await assertPhaseAndFit('dawn')
+  await setMode('dense')
+  await page.getByRole('radio', { name: 'Light', exact: true }).click()
+  await assertPhaseAndFit('dense')
+  await setMode('dawn')
+  await page.getByRole('radio', { name: 'Dark', exact: true }).click()
+  await assertPhaseAndFit('dawn')
+  await setMode('dense')
+
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
+  await page.getByRole('radio', { name: 'System', exact: true }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark')
+  await assertPhaseAndFit('dense')
+  await setMode('dawn')
+
+  expect(apiRequests.sort()).toEqual([
+    '/api/bookmarks',
+    '/api/ebird/summary',
+    '/api/llmdash/summary',
+    '/api/weather',
+  ])
+
+  const requestCount = apiRequests.length
+  await page
+    .getByRole('button', { name: 'Refresh weather, bookmarks, eBird, and llmdash data' })
+    .click()
+  await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
+  expect(apiRequests.slice(requestCount).sort()).toEqual([
+    '/api/bookmarks',
+    '/api/ebird/summary',
+    '/api/llmdash/summary',
+    '/api/weather',
+  ])
+  await expect(page.getByText('Waxing gibbous', { exact: true })).toBeVisible()
+})
+
+test('moon phase survives first-load and unavailable weather without becoming a source state', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2024-04-23T23:49:00.000Z'))
+  const weatherGate = requestGate()
+  await page.addInitScript(() => localStorage.removeItem('homedash.cache.weather.v1'))
+  await page.route('**/api/weather', async (route) => {
+    await weatherGate.promise
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Weather is unavailable for this fixture.' }),
+    })
+  })
+
+  await page.goto('/')
+  await expect(page.getByText('Full moon', { exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('status', { name: 'Asking Open-Meteo for the latest reading…' }),
+  ).toBeVisible()
+
+  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await expect(page.getByText('Full moon', { exact: true })).toBeVisible()
+  await expect(page.getByRole('status', { name: 'Reading weather…' })).toBeVisible()
+
+  weatherGate.release()
+  await expect(page.getByText('No weather.')).toBeVisible()
+  await expect(page.getByText('Full moon', { exact: true })).toBeVisible()
+  await expect(page.locator('.dense-phase')).not.toHaveAttribute('aria-busy')
+  await expect(page.getByText(/of 4 sources/)).toBeVisible()
+
+  await page.getByRole('radio', { name: 'Use Dawn display mode' }).click()
+  await expect(page.getByText('Weather could not be reached.')).toBeVisible()
+  await expect(page.getByText('Full moon', { exact: true })).toBeVisible()
+})
+
+test('invalid device time omits lunar output while solar and weather content remain', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Date.now = () => Number.NaN
+  })
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
+
+  await expect(page.locator('.moon-phase, .dense-phase')).toHaveCount(0)
+  await expect(page.getByText('58°').first()).toBeVisible()
+  await expect(page.getByText(/Sunrise/).first()).toBeVisible()
+
+  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await expect(page.locator('.moon-phase, .dense-phase')).toHaveCount(0)
+  await expect(page.getByText('58°').first()).toBeVisible()
+  await expect(page.getByText(/daylight 12h 49m/)).toBeVisible()
+  await expect(page.getByText(/of 4 sources/)).toBeVisible()
+})

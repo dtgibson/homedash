@@ -1,20 +1,22 @@
 import type { DashboardData, WidgetName } from '../hooks/useDashboardData'
 import { formatAge, formatMiles, signed } from '../lib/format'
+import type { MoonPhaseLabel } from '../lib/moonPhase'
 import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DenseProvider } from './Quota'
 import { TargetList, TargetTabs } from './Targets'
-import { DenseWeather } from './Weather'
+import { DenseDaylight, DenseWeather } from './Weather'
 import { ErrorState, LoadingState, SourceFreshness } from './WidgetState'
 
 interface DenseViewProps {
   data: DashboardData
+  moonPhase: MoonPhaseLabel | null
   category: TargetCategory
   onCategory: (category: TargetCategory) => void
   onRetry: (source: WidgetName) => void
 }
 
-export function DenseView({ data, category, onCategory, onRetry }: DenseViewProps) {
+export function DenseView({ data, moonPhase, category, onCategory, onRetry }: DenseViewProps) {
   const weather = data.weather.status === 'ready' ? data.weather.data : null
   const ebird = data.ebird.status === 'ready' ? data.ebird.data : null
   const llmdash = data.llmdash.status === 'ready' ? data.llmdash.data : null
@@ -70,6 +72,7 @@ export function DenseView({ data, category, onCategory, onRetry }: DenseViewProp
               />
             )}
             {weather && <DenseWeather envelope={weather} />}
+            <DenseDaylight envelope={weather} moonPhase={moonPhase} />
           </div>
         </section>
 

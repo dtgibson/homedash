@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { dashboard } = vi.hoisted(() => {
+const { dashboard, moonPhase } = vi.hoisted(() => {
   const now = '2026-09-08T05:00:00.000Z'
   const meta = {
     generatedAt: now,
@@ -12,6 +12,10 @@ const { dashboard } = vi.hoisted(() => {
     issues: [],
   }
   return {
+    moonPhase: {
+      label: 'Waxing gibbous' as const,
+      reevaluate: vi.fn(),
+    },
     dashboard: {
       data: {
         weather: {
@@ -153,6 +157,7 @@ const { dashboard } = vi.hoisted(() => {
 })
 
 vi.mock('./hooks/useDashboardData', () => ({ useDashboardData: () => dashboard }))
+vi.mock('./hooks/useMoonPhase', () => ({ useMoonPhase: () => moonPhase }))
 
 import App from './App'
 
@@ -163,13 +168,30 @@ beforeEach(() => {
   dashboard.isRefreshing = false
   dashboard.refreshProgress = 4
   dashboard.visibleSourceCount = 4
+  moonPhase.label = 'Waxing gibbous'
   Object.values(dashboard.data).forEach((widget) => {
     widget.refreshStatus = 'idle'
     widget.message = null
+    widget.data.meta.freshness = 'fresh'
   })
 })
 
 describe('one store with two renderers', () => {
+  it('passes one authoritative moon phase through renderer and appearance changes', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.getByText('Moon')).toBeVisible()
+    expect(screen.getByText('Waxing gibbous')).toBeVisible()
+
+    await user.click(screen.getByRole('radio', { name: 'Dark' }))
+    expect(screen.getByText('Waxing gibbous')).toBeVisible()
+    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
+    expect(screen.getByText('Waxing gibbous')).toBeVisible()
+    expect(screen.getByText(/moon ·/i)).toBeVisible()
+    expect(screen.getAllByText('Waxing gibbous')).toHaveLength(1)
+  })
+
   it('switches presentation without losing values and persists the mode per browser', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -289,5 +311,35 @@ describe('one store with two renderers', () => {
     expect(screen.getByRole('link', { name: 'GitHub' })).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Try bookmarks again' }))
     expect(dashboard.retryWidget).toHaveBeenCalledWith('bookmarks')
+    await waitFor(() => expect(moonPhase.reevaluate).toHaveBeenCalledTimes(1))
+  })
+
+  it('re-evaluates lunar context when a weather retry settles', async () => {
+    const user = userEvent.setup()
+    dashboard.data.weather.refreshStatus = 'failed'
+    dashboard.data.weather.message = 'Weather refresh timed out.'
+    dashboard.data.weather.data.meta.freshness = 'stale'
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Try weather again' }))
+
+    expect(dashboard.retryWidget).toHaveBeenCalledWith('weather')
+    await waitFor(() => expect(moonPhase.reevaluate).toHaveBeenCalledTimes(1))
+    expect(screen.getByText('Waxing gibbous')).toBeVisible()
+  })
+
+  it('re-evaluates lunar context after global and location refreshes settle', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Refresh weather, bookmarks, eBird, and llmdash data' }),
+    )
+    await waitFor(() => expect(dashboard.refreshAll).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(moonPhase.reevaluate).toHaveBeenCalledTimes(1))
+
+    await user.click(screen.getByRole('button', { name: 'Update device location' }))
+    await waitFor(() => expect(dashboard.retryLocation).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(moonPhase.reevaluate).toHaveBeenCalledTimes(2))
   })
 })

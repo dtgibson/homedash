@@ -229,6 +229,10 @@ body {
   letter-spacing: 0.06em;
 }
 
+.moon-phase {
+  margin-top: 5px;
+}
+
 .dawn-composition {
   display: grid;
   grid-template-columns: minmax(0, 1.06fr) minmax(0, 1fr) minmax(250px, 0.82fr);
@@ -656,6 +660,11 @@ a.target-item:hover strong {
   margin-top: 7px;
 }
 
+.dense-daylight-line {
+  margin-top: 5px;
+  font-size: 7px;
+}
+
 .dense-hour {
   font-size: 9px;
 }
@@ -961,14 +970,14 @@ a.target-item:hover strong {
   }
 
   .dawn {
-    padding: 7px 10px 8px;
+    padding: 6px 10px 7px;
   }
 
   .dawn-masthead {
     grid-template-columns: minmax(0, 1fr) 128px;
     gap: 12px;
-    height: 52px;
-    padding-bottom: 5px;
+    height: 60px;
+    padding-bottom: 4px;
   }
 
   .dawn h1 {
@@ -993,19 +1002,31 @@ a.target-item:hover strong {
   }
 
   .sun-arc svg {
-    height: 33px;
+    height: 27px;
   }
 
   .sun-times {
-    margin-top: 1px;
-    font-size: 6.5px;
+    margin-top: 0;
+    font-size: 6px;
     letter-spacing: 0;
+  }
+
+  .moon-phase {
+    gap: 3px;
+    margin-top: 2px;
+    font-size: 6px;
+    line-height: 1.1;
+  }
+
+  .moon-phase-prefix {
+    font-size: 5.5px;
+    letter-spacing: 0.06em;
   }
 
   .dawn-composition {
     grid-template-columns: 1fr;
-    grid-template-rows: 126px minmax(257px, 1fr) 151px;
-    height: calc(100% - 52px);
+    grid-template-rows: 126px minmax(257px, 1fr) 145px;
+    height: calc(100% - 60px);
   }
 
   .story {
@@ -1390,6 +1411,15 @@ a.target-item:hover strong {
     margin-top: 2px;
     font-size: 6px;
     text-align: center;
+  }
+
+  .dense-daylight-line {
+    margin-top: 2px;
+    font-size: 6px;
+  }
+
+  .dense-solar-summary {
+    flex: 1 1 auto;
   }
 
   .dense-target-list .target-item {

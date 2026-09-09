@@ -1,5 +1,6 @@
 import type { WeatherEnvelope } from '../shared/contracts'
 import { formatAge, formatPercent, formatTemperature, formatTime } from '../lib/format'
+import type { MoonPhaseLabel } from '../lib/moonPhase'
 
 export function LocationProvenance({ envelope }: { envelope: WeatherEnvelope }) {
   const location = envelope.meta.location
@@ -45,6 +46,28 @@ export function SunArc({ envelope }: { envelope: WeatherEnvelope }) {
         </span>
         <span>Sunset {formatTime(weather.sunset)}</span>
       </div>
+    </div>
+  )
+}
+
+export function DawnDaylight({
+  envelope,
+  moonPhase,
+}: {
+  envelope: WeatherEnvelope | null
+  moonPhase: MoonPhaseLabel | null
+}) {
+  if (!envelope && !moonPhase) return null
+  return (
+    <div className="daylight-context">
+      {envelope && <SunArc envelope={envelope} />}
+      {moonPhase && (
+        <p className="moon-phase">
+          <span className="moon-phase-prefix">Moon</span>
+          <span aria-hidden="true">·</span>
+          <span className="moon-phase-label">{moonPhase}</span>
+        </p>
+      )}
     </div>
   )
 }
@@ -146,12 +169,33 @@ export function DenseWeather({ envelope }: { envelope: WeatherEnvelope }) {
             {formatTemperature(hour.temperature)}
           </span>
         ))}
-        <span className="dense-faint">sunrise {formatTime(weather.sunrise)}</span>
-        <span className="dense-faint">sunset {formatTime(weather.sunset)}</span>
-        <span className="dense-faint">
-          daylight {Math.floor(weather.daylightMinutes / 60)}h {weather.daylightMinutes % 60}m
-        </span>
       </div>
     </>
+  )
+}
+
+export function DenseDaylight({
+  envelope,
+  moonPhase,
+}: {
+  envelope: WeatherEnvelope | null
+  moonPhase: MoonPhaseLabel | null
+}) {
+  if (!envelope && !moonPhase) return null
+  return (
+    <div className="dense-wrap dense-daylight-line">
+      {envelope && (
+        <span className="dense-faint dense-solar-summary">
+          sunrise {formatTime(envelope.data.sunrise)} · sunset {formatTime(envelope.data.sunset)} ·
+          daylight {Math.floor(envelope.data.daylightMinutes / 60)}h{' '}
+          {envelope.data.daylightMinutes % 60}m
+        </span>
+      )}
+      {moonPhase && (
+        <span className="dense-phase">
+          moon · <span className="moon-phase-label">{moonPhase}</span>
+        </span>
+      )}
+    </div>
   )
 }

@@ -1,10 +1,11 @@
 import type { DashboardData, WidgetName } from '../hooks/useDashboardData'
 import { formatAge, formatMiles, signed } from '../lib/format'
+import type { MoonPhaseLabel } from '../lib/moonPhase'
 import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DawnProvider } from './Quota'
 import { TargetList, TargetTabs } from './Targets'
-import { DawnWeather, LocationProvenance, SunArc } from './Weather'
+import { DawnDaylight, DawnWeather, LocationProvenance } from './Weather'
 import { ErrorState, LoadingState, SourceFreshness, StateBadge } from './WidgetState'
 
 function dayGreeting(date = new Date()) {
@@ -23,12 +24,13 @@ function dateLabel(date = new Date()) {
 
 interface ViewProps {
   data: DashboardData
+  moonPhase: MoonPhaseLabel | null
   category: TargetCategory
   onCategory: (category: TargetCategory) => void
   onRetry: (source: WidgetName) => void
 }
 
-export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
+export function DawnView({ data, moonPhase, category, onCategory, onRetry }: ViewProps) {
   const weather = data.weather.status === 'ready' ? data.weather.data : null
   const ebird = data.ebird.status === 'ready' ? data.ebird.data : null
   const llmdash = data.llmdash.status === 'ready' ? data.llmdash.data : null
@@ -46,7 +48,7 @@ export function DawnView({ data, category, onCategory, onRetry }: ViewProps) {
           <h1 id="dawn-title">{dayGreeting()}</h1>
           <p className="lede">{lede}</p>
         </div>
-        {weather ? <SunArc envelope={weather} /> : <LoadingState message="Reading daylight…" />}
+        <DawnDaylight envelope={weather} moonPhase={moonPhase} />
       </header>
 
       <div className="dawn-composition">

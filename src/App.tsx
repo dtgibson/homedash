@@ -4,6 +4,7 @@ import { DenseView } from './components/DenseView'
 import type { TargetCategory } from './components/Targets'
 import { Toolbar } from './components/Toolbar'
 import { useDashboardData, type WidgetName } from './hooks/useDashboardData'
+import { useMoonPhase } from './hooks/useMoonPhase'
 import { usePreferences } from './hooks/usePreferences'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToast(''), 2600)
   }, [])
   const dashboard = useDashboardData(announce)
+  const moonPhase = useMoonPhase()
 
   useEffect(() => {
     return () => {
@@ -26,17 +28,25 @@ export default function App() {
   }, [])
 
   const retryAll = async () => {
-    await dashboard.refreshAll()
+    try {
+      await dashboard.refreshAll()
+    } finally {
+      moonPhase.reevaluate()
+    }
   }
 
   const retrySource = (source: WidgetName) => {
-    void dashboard.retryWidget(source)
+    void dashboard.retryWidget(source).finally(moonPhase.reevaluate)
   }
 
   const retryLocation = async () => {
     announce('Requesting this device’s location…')
-    await dashboard.retryLocation()
-    announce(dashboard.locationMessage)
+    try {
+      await dashboard.retryLocation()
+      announce(dashboard.locationMessage)
+    } finally {
+      moonPhase.reevaluate()
+    }
   }
 
   return (
@@ -60,6 +70,7 @@ export default function App() {
       {preferences.mode === 'dawn' ? (
         <DawnView
           data={dashboard.data}
+          moonPhase={moonPhase.label}
           category={category}
           onCategory={(next) => {
             setCategory(next)
@@ -70,6 +81,7 @@ export default function App() {
       ) : (
         <DenseView
           data={dashboard.data}
+          moonPhase={moonPhase.label}
           category={category}
           onCategory={(next) => {
             setCategory(next)
