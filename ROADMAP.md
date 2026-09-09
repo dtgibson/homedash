@@ -8,16 +8,18 @@ from.
 
 ## Shipped
 
-Nothing yet.
+- **Count:** 1
+- **Last shipped:** homedash v1 — A private tailnet start page now combines
+  per-device Dawn and Dense views, location-aware weather, closest-first eBird
+  targets, ordered bookmarks, and llmdash coding headroom.
+- **Previously:** None.
 
 ---
 
 ## Up Next
 
-1. **homedash v1** — ship the complete personal start page with both display
-   modes over one shared data layer: weather, bookmarks, eBird year stats, and
-   llmdash headroom. The mode choice sticks per device, the layout works on
-   laptop and phone, and access remains private to the tailnet.
+No feature is committed yet. Learn from daily use before choosing the next
+widget or management workflow.
 
 ---
 

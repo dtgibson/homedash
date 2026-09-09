@@ -6,7 +6,7 @@
 
 ## Overview
 
-Homedash is a React/Vite/TypeScript web client served from a same-origin Fastify/Node server. It defaults to `127.0.0.1:1910` when run locally. A Raspberry Pi deployment binds explicitly to its private Tailscale address on port `1910`; public exposure is not supported.
+Homedash is a React/Vite/TypeScript web client served from a same-origin Fastify/Node server. It defaults to `127.0.0.1:1910` when run locally. A Raspberry Pi deployment keeps Fastify on loopback and gives Tailscale a dedicated tailnet-only HTTPS listener on port `1910`; public exposure is not supported.
 
 The browser owns device preferences, location permission, the eligible last-known location, and last-successful widget snapshots. Fastify owns private configuration, upstream calls, normalization, validation, short-lived caches, and failure isolation. Dawn and Dense are two presentations over the same normalized widget state.
 
@@ -183,7 +183,7 @@ Manual refresh calls all four widget routes independently with `X-Homedash-Refre
 10. **Simple bookmark ownership.** File order is display order; no bookmark editor or database is introduced.
 11. **Runtime validation at every boundary.** Malformed local, configured, or upstream data degrades one source without crashing the dashboard.
 12. **Extensible widget registry.** Each widget registers its schema, loader, freshness policy, cached fallback, and two renderers. A future widget needs no central database migration.
-13. **Private deployment default.** The server binds to loopback by default. Pi access binds explicitly to a Tailscale address; CORS remains disabled and public hosting is out of scope.
+13. **Private deployment default.** The server remains bound to loopback. Tailscale owns the authenticated HTTPS listener for Pi access; CORS remains disabled and public hosting is out of scope.
 
 ## Assumptions
 
