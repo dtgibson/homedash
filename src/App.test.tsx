@@ -128,9 +128,10 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
           data: {
             schemaVersion: 1 as const,
             data: {
+              sections: ['Daily'],
               bookmarks: [
                 {
-                  id: 'github',
+                  id: '0123456789abcdef',
                   group: 'Daily',
                   name: 'GitHub',
                   url: 'https://github.com',
@@ -152,6 +153,7 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
       retryLocation: vi.fn(async () => undefined),
       retryWidget: vi.fn(async () => undefined),
       refreshAll: vi.fn(async () => undefined),
+      acceptSavedBookmarks: vi.fn(() => true),
     },
   }
 })
@@ -174,9 +176,63 @@ beforeEach(() => {
     widget.message = null
     widget.data.meta.freshness = 'fresh'
   })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            schemaVersion: 1,
+            revision: `sha256:${'a'.repeat(64)}`,
+            document: {
+              schemaVersion: 1,
+              sections: [
+                {
+                  name: 'Daily',
+                  bookmarks: [{ name: 'GitHub', url: 'https://github.com' }],
+                },
+              ],
+            },
+            display: dashboard.data.bookmarks.data,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    ),
+  )
 })
 
+async function openSettings(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Settings' }))
+  await screen.findByRole('dialog', { name: 'Settings' })
+}
+
+async function closeSettings(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Close' }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull())
+}
+
 describe('one store with two renderers', () => {
+  it('removes the dashboard from assistive technology while Settings is modal', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const main = screen.getByRole('main')
+    const dashboardSurface = main.closest('.shell')
+
+    await openSettings(user)
+
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toHaveAttribute('aria-modal', 'true')
+    expect(screen.queryByRole('main')).toBeNull()
+    expect(screen.getByRole('main', { hidden: true })).toBe(main)
+    expect(dashboardSurface).toHaveAttribute('aria-hidden', 'true')
+    expect(dashboardSurface).toHaveAttribute('inert')
+
+    await closeSettings(user)
+
+    expect(screen.getByRole('main')).toBe(main)
+    expect(dashboardSurface).not.toHaveAttribute('aria-hidden')
+    expect(dashboardSurface).not.toHaveAttribute('inert')
+  })
+
   it('passes one authoritative moon phase through renderer and appearance changes', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -184,9 +240,11 @@ describe('one store with two renderers', () => {
     expect(screen.getByText('Moon')).toBeVisible()
     expect(screen.getByText('Waxing gibbous')).toBeVisible()
 
+    await openSettings(user)
     await user.click(screen.getByRole('radio', { name: 'Dark' }))
+    await user.click(screen.getByRole('radio', { name: 'Dense' }))
+    await closeSettings(user)
     expect(screen.getByText('Waxing gibbous')).toBeVisible()
-    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
     expect(screen.getByText('Waxing gibbous')).toBeVisible()
     expect(screen.getByText(/moon ·/i)).toBeVisible()
     expect(screen.getAllByText('Waxing gibbous')).toHaveLength(1)
@@ -199,7 +257,9 @@ describe('one store with two renderers', () => {
     expect(screen.getAllByText('57°')[0]).toBeVisible()
     expect(screen.getByText('Ruff')).toBeVisible()
 
-    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
+    await openSettings(user)
+    await user.click(screen.getByRole('radio', { name: 'Dense' }))
+    await closeSettings(user)
     expect(screen.getByRole('heading', { name: 'Weather' })).toBeVisible()
     expect(screen.getAllByText('57°')[0]).toBeVisible()
     expect(screen.getByText('Ruff')).toBeVisible()
@@ -209,11 +269,38 @@ describe('one store with two renderers', () => {
   it('keeps appearance independent and applies a saved explicit palette', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openSettings(user)
     await user.click(screen.getByRole('radio', { name: 'Dark' }))
+    await closeSettings(user)
     await waitFor(() => expect(document.documentElement.dataset.appearance).toBe('dark'))
     expect(JSON.parse(localStorage.getItem('homedash.preferences.v1') ?? '{}').appearance).toBe(
       'dark',
     )
+  })
+
+  it('keeps a browser preference active and announces when storage refuses it', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await openSettings(user)
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = () => {
+      throw new DOMException('Storage disabled', 'SecurityError')
+    }
+    try {
+      await user.click(screen.getByRole('radio', { name: 'Dense' }))
+    } finally {
+      Storage.prototype.setItem = original
+    }
+
+    expect(screen.queryByRole('heading', { name: 'Weather' })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Weather', hidden: true })).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Dense view · system appearance applied, but this browser could not retain it.',
+      ),
+    ).toBeVisible()
+    await closeSettings(user)
+    expect(screen.getByRole('heading', { name: 'Weather' })).toBeVisible()
   })
 
   it('keeps one ephemeral Kagi form across renderers and focuses it only on mount', async () => {
@@ -232,10 +319,12 @@ describe('one store with two renderers', () => {
     )
 
     await user.type(query, '  sandhill crane  ')
-    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
+    await openSettings(user)
+    await user.click(screen.getByRole('radio', { name: 'Dense' }))
+    await closeSettings(user)
     expect(screen.getAllByRole('search')).toHaveLength(1)
     expect(query).toHaveValue('  sandhill crane  ')
-    expect(query).not.toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Settings' })).toHaveFocus()
 
     form.addEventListener('submit', (event) => event.preventDefault(), { once: true })
     fireEvent.submit(form)
@@ -275,7 +364,9 @@ describe('one store with two renderers', () => {
     }
 
     expectLaunches()
-    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
+    await openSettings(user)
+    await user.click(screen.getByRole('radio', { name: 'Dense' }))
+    await closeSettings(user)
     expectLaunches()
     expect(screen.queryByText(/\bkm\b/i)).not.toBeInTheDocument()
   })
@@ -296,7 +387,9 @@ describe('one store with two renderers', () => {
     ).toHaveTextContent('Refreshing 2/4')
     expect(screen.getAllByRole('status', { name: /Refreshing/ })).toHaveLength(2)
 
-    await user.click(screen.getByRole('radio', { name: 'Use Dense display mode' }))
+    await openSettings(user)
+    await user.click(screen.getByRole('radio', { name: 'Dense' }))
+    await closeSettings(user)
     expect(screen.getAllByRole('status', { name: /Refreshing/ })).toHaveLength(2)
   })
 

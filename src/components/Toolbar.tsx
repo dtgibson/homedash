@@ -1,6 +1,4 @@
-import * as ToggleGroup from '@radix-ui/react-toggle-group'
-import { useEffect, useRef, type FormEvent } from 'react'
-import type { DevicePreferences } from '../shared/contracts'
+import { useEffect, useRef, type FormEvent, type RefObject } from 'react'
 
 function LocationIcon() {
   return (
@@ -20,9 +18,18 @@ function RefreshIcon() {
   )
 }
 
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.09A1.7 1.7 0 0 0 9 19.36a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1-1.55V3h4v.09A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9a1.7 1.7 0 0 0 1.56 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" />
+    </svg>
+  )
+}
+
 interface ToolbarProps {
-  preferences: DevicePreferences
-  onPreferences: (preferences: DevicePreferences) => void
+  settingsTriggerRef: RefObject<HTMLButtonElement | null>
+  onSettings: () => void
   onLocation: () => void
   onRefresh: () => void
   onStatus: (message: string) => void
@@ -33,8 +40,8 @@ interface ToolbarProps {
 }
 
 export function Toolbar({
-  preferences,
-  onPreferences,
+  settingsTriggerRef,
+  onSettings,
   onLocation,
   onRefresh,
   onStatus,
@@ -111,37 +118,15 @@ export function Toolbar({
         </button>
       </form>
       <div className="toolbar-controls">
-        <ToggleGroup.Root
-          className="control-set"
-          type="single"
-          value={preferences.mode}
-          aria-label="Display mode"
-          onValueChange={(mode) => {
-            if (mode === 'dawn' || mode === 'dense') onPreferences({ ...preferences, mode })
-          }}
+        <button
+          ref={settingsTriggerRef}
+          className="icon-button settings-button"
+          type="button"
+          onClick={onSettings}
         >
-          <ToggleGroup.Item value="dawn" aria-label="Use Dawn display mode">
-            Dawn
-          </ToggleGroup.Item>
-          <ToggleGroup.Item value="dense" aria-label="Use Dense display mode">
-            Dense
-          </ToggleGroup.Item>
-        </ToggleGroup.Root>
-        <ToggleGroup.Root
-          className="control-set"
-          type="single"
-          value={preferences.appearance}
-          aria-label="Appearance"
-          onValueChange={(appearance) => {
-            if (appearance === 'system' || appearance === 'light' || appearance === 'dark') {
-              onPreferences({ ...preferences, appearance })
-            }
-          }}
-        >
-          <ToggleGroup.Item value="system">System</ToggleGroup.Item>
-          <ToggleGroup.Item value="light">Light</ToggleGroup.Item>
-          <ToggleGroup.Item value="dark">Dark</ToggleGroup.Item>
-        </ToggleGroup.Root>
+          <SettingsIcon />
+          <span>Settings</span>
+        </button>
         <button
           className={`icon-button ${locating ? 'is-busy' : ''}`}
           type="button"

@@ -18,7 +18,7 @@ The browser owns per-device preferences, last-known location, and last-good widg
 
 ## Stack and Delivery
 
-The application uses TypeScript, React, Vite, Tailwind CSS, Radix UI, Fastify, and Node.js 22+. Production is a systemd user service bound to loopback and exposed to authenticated tailnet devices through Tailscale HTTPS on port 1910.
+The application uses TypeScript, React, Vite, Tailwind CSS, Radix UI, Fastify, and Node.js 22+. Production is a systemd user service bound to loopback and exposed to authenticated tailnet devices through Tailscale HTTPS on port 1910. The private bookmark document API accepts only exact configured loopback/Tailscale Hosts and origins, and new writable bookmark state lives in a dedicated mode-`0700` directory.
 
 ## Product Boundaries
 

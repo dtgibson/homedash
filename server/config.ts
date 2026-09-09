@@ -9,6 +9,39 @@ const optionalCoordinate = z.preprocess(
 type LlmdashLaunchDestination =
   { status: 'ready'; url: URL } | { status: 'unavailable'; reason: 'missing' | 'invalid' }
 
+function parseAllowedOrigins(value: string | undefined, port: number) {
+  const configured = value ?? `http://127.0.0.1:${port},http://127.0.0.1:5173`
+  const origins = configured.split(',').map((entry) => entry.trim())
+  if (!origins.length || origins.some((origin) => !origin)) {
+    throw new Error('HOMEDASH_ALLOWED_ORIGINS must contain exact comma-separated origins.')
+  }
+  const canonical = origins.map((origin) => {
+    let parsed: URL
+    try {
+      parsed = new URL(origin)
+    } catch {
+      throw new Error('HOMEDASH_ALLOWED_ORIGINS contains an invalid origin.')
+    }
+    const isLoopback = ['127.0.0.1', '[::1]', 'localhost'].includes(parsed.hostname)
+    if (
+      parsed.origin !== origin ||
+      !parsed.hostname ||
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== '/' ||
+      parsed.search ||
+      parsed.hash ||
+      (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback))
+    ) {
+      throw new Error(
+        'HOMEDASH_ALLOWED_ORIGINS must contain exact HTTPS origins or exact loopback HTTP origins.',
+      )
+    }
+    return parsed.origin
+  })
+  return [...new Set(canonical)]
+}
+
 function parseLlmdashLaunchDestination(value: string | undefined): LlmdashLaunchDestination {
   if (value == null || value.trim() === '') return { status: 'unavailable', reason: 'missing' }
   try {
@@ -32,6 +65,7 @@ const envSchema = z
   .object({
     HOMEDASH_HOST: z.string().default('127.0.0.1'),
     HOMEDASH_PORT: z.coerce.number().int().min(1).max(65_535).default(1910),
+    HOMEDASH_ALLOWED_ORIGINS: z.string().optional(),
     SNOWRAVEN_URL: z.url().default('http://127.0.0.1:1620'),
     LLMDASH_URL: z.url().default('http://127.0.0.1:8787'),
     LLMDASH_LAUNCH_URL: z.string().optional(),
@@ -70,6 +104,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
   return {
     host: value.HOMEDASH_HOST,
     port: value.HOMEDASH_PORT,
+    bookmarkDocumentOrigins: parseAllowedOrigins(
+      value.HOMEDASH_ALLOWED_ORIGINS,
+      value.HOMEDASH_PORT,
+    ),
     snowRavenUrl: value.SNOWRAVEN_URL.replace(/\/$/, ''),
     llmdashUrl: value.LLMDASH_URL.replace(/\/$/, ''),
     llmdashLaunch: parseLlmdashLaunchDestination(value.LLMDASH_LAUNCH_URL),

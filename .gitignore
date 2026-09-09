@@ -27,6 +27,7 @@ test-results/
 # Private host configuration
 config/bookmarks.json
 config/private.json
+state/
 
 # Editor
 .vscode/

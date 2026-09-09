@@ -49,9 +49,10 @@ function envelopes({
     bookmarks: {
       schemaVersion: 1 as const,
       data: {
+        sections: ['Daily'],
         bookmarks: [
           {
-            id: bookmark.toLowerCase(),
+            id: '0123456789abcdef',
             group: 'Daily',
             name: bookmark,
             url: 'https://example.com',
@@ -167,6 +168,36 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('cached dashboard refresh lifecycle', () => {
+  it('synthesizes first-seen sections when hydrating an older bookmark snapshot', () => {
+    const saved = envelopes().bookmarks
+    localStorage.setItem(
+      'homedash.cache.bookmarks.v1',
+      JSON.stringify({
+        ...saved,
+        data: {
+          bookmarks: [
+            { ...saved.data.bookmarks[0], group: 'Daily', name: 'One', order: 0 },
+            { ...saved.data.bookmarks[0], group: 'Projects', name: 'Two', order: 1 },
+            { ...saved.data.bookmarks[0], group: 'Daily', name: 'Three', order: 2 },
+          ],
+          invalidEntryCount: 0,
+        },
+      }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    )
+
+    const { result } = renderHook(() => useDashboardData())
+
+    expect(result.current.data.bookmarks).toMatchObject({
+      status: 'ready',
+      refreshStatus: 'refreshing',
+      data: { data: { sections: ['Daily', 'Projects'] } },
+    })
+  })
+
   it('hydrates all four validated snapshots, settles independently, and preserves a failed source', async () => {
     const saved = envelopes({
       temperature: 41,
@@ -349,6 +380,58 @@ describe('cached dashboard refresh lifecycle', () => {
     })
     expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.headers).toMatchObject({
       'x-homedash-refresh': '1',
+    })
+  })
+
+  it('accepts a confirmed bookmark display without replacing or refreshing another widget', async () => {
+    const initial = envelopes()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const key = paths[pathFor(input) as keyof typeof paths]
+        return Promise.resolve(response(initial[key]))
+      }),
+    )
+    const { result } = renderHook(() => useDashboardData())
+    await waitFor(() => expect(result.current.isRefreshing).toBe(false))
+    const weather = result.current.data.weather
+    const ebird = result.current.data.ebird
+    const llmdash = result.current.data.llmdash
+    const confirmed = {
+      ...initial.bookmarks,
+      data: {
+        sections: ['Empty'],
+        bookmarks: [],
+        invalidEntryCount: 0,
+      },
+    }
+
+    act(() => {
+      expect(result.current.acceptSavedBookmarks(confirmed)).toBe(true)
+    })
+
+    expect(result.current.data.bookmarks).toMatchObject({
+      status: 'ready',
+      refreshStatus: 'idle',
+      data: { data: { sections: ['Empty'], bookmarks: [] } },
+    })
+    expect(result.current.data.weather).toBe(weather)
+    expect(result.current.data.ebird).toBe(ebird)
+    expect(result.current.data.llmdash).toBe(llmdash)
+    expect(JSON.parse(localStorage.getItem('homedash.cache.bookmarks.v1') ?? 'null')).toEqual(
+      confirmed,
+    )
+
+    act(() => {
+      expect(
+        result.current.acceptSavedBookmarks({
+          ...confirmed,
+          data: { ...confirmed.data, sections: [''], invalidEntryCount: 0 },
+        }),
+      ).toBe(false)
+    })
+    expect(result.current.data.bookmarks).toMatchObject({
+      data: { data: { sections: ['Empty'] } },
     })
   })
 })

@@ -24,8 +24,10 @@ export function readPreferences(): DevicePreferences {
 export function savePreferences(value: DevicePreferences) {
   try {
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(value))
+    return true
   } catch {
     // Preferences still work for this visit if storage is unavailable.
+    return false
   }
 }
 

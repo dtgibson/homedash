@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 const now = new Date().toISOString()
 const meta = {
@@ -32,9 +32,94 @@ function bookmarkSnapshot(
 ) {
   return {
     schemaVersion: 1,
-    data: { bookmarks, invalidEntryCount: 0 },
+    data: {
+      sections: [...new Set(bookmarks.map((bookmark) => bookmark.group))],
+      bookmarks,
+      invalidEntryCount: 0,
+    },
     meta,
   }
+}
+
+const defaultBookmarkDocument = {
+  schemaVersion: 1 as const,
+  sections: [
+    {
+      name: 'Daily',
+      bookmarks: [
+        { name: 'Gmail', url: 'https://mail.google.com' },
+        { name: 'Calendar', url: 'https://calendar.google.com' },
+      ],
+    },
+    { name: 'Projects', bookmarks: [{ name: 'GitHub', url: 'https://github.com' }] },
+    {
+      name: 'Birding',
+      bookmarks: [
+        { name: 'eBird', url: 'https://ebird.org' },
+        { name: 'Macaulay Library', url: 'https://macaulaylibrary.org' },
+      ],
+    },
+  ],
+}
+
+function bookmarkDocumentResponse(
+  document: typeof defaultBookmarkDocument = defaultBookmarkDocument,
+  revisionCharacter = 'a',
+) {
+  let order = 0
+  const bookmarks = document.sections.flatMap((section) =>
+    section.bookmarks.map((bookmark) => {
+      order += 1
+      return {
+        id: order.toString(16).padStart(16, '0'),
+        group: section.name,
+        name: bookmark.name,
+        url: bookmark.url,
+        order: order - 1,
+      }
+    }),
+  )
+  const display = bookmarkSnapshot(bookmarks)
+  display.data.sections = document.sections.map((section) => section.name)
+  return {
+    schemaVersion: 1,
+    revision: `sha256:${revisionCharacter.repeat(64)}`,
+    document,
+    display,
+  }
+}
+
+async function openSettings(page: Page) {
+  await page.getByRole('button', { name: 'Settings' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText('Shared bookmarks')).toBeVisible()
+  await dialog.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished)).then(
+      () => undefined,
+    ),
+  )
+  return dialog
+}
+
+async function closeSettings(page: Page) {
+  await page
+    .getByRole('dialog', { name: 'Settings' })
+    .getByRole('button', { name: 'Close' })
+    .click()
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
+}
+
+async function selectMode(page: Page, mode: 'Dawn' | 'Dense') {
+  const dialog = await openSettings(page)
+  await dialog.getByRole('radio', { name: mode, exact: true }).click()
+  await closeSettings(page)
+}
+
+async function selectAppearance(page: Page, appearance: 'System' | 'Light' | 'Dark') {
+  const dialog = await openSettings(page)
+  await dialog.getByRole('radio', { name: appearance, exact: true }).click()
+  await closeSettings(page)
 }
 
 test.beforeEach(async ({ context, page }) => {
@@ -44,7 +129,14 @@ test.beforeEach(async ({ context, page }) => {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     let body: unknown
-    if (/^\/api\/bookmarks\/[^/]+\/favicon$/.test(path)) {
+    if (path === '/api/bookmarks/document') {
+      const candidate =
+        route.request().method() === 'PUT'
+          ? ((route.request().postDataJSON() as { document?: typeof defaultBookmarkDocument })
+              .document ?? defaultBookmarkDocument)
+          : defaultBookmarkDocument
+      body = bookmarkDocumentResponse(candidate, route.request().method() === 'PUT' ? 'b' : 'a')
+    } else if (/^\/api\/bookmarks\/[^/]+\/favicon$/.test(path)) {
       await route.fulfill({ status: 404, headers: { 'cache-control': 'private, max-age=900' } })
       return
     } else if (path === '/api/weather') {
@@ -194,6 +286,7 @@ test.beforeEach(async ({ context, page }) => {
       body = {
         schemaVersion: 1,
         data: {
+          sections: ['Daily', 'Projects', 'Birding'],
           bookmarks: [
             {
               id: '0000000000000001',
@@ -328,7 +421,9 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
     fullPage: true,
   })
 
-  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  const settings = await openSettings(page)
+  await settings.getByRole('radio', { name: 'Dense', exact: true }).click()
+  await closeSettings(page)
   await expect(page.getByRole('heading', { name: 'Weather' })).toBeVisible()
   for (const name of [...targetNames, ...bookmarkNames]) {
     await expect(page.locator('main')).toContainText(name)
@@ -346,11 +441,15 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
     '/launch/llmdash',
   )
 
-  await page.getByRole('radio', { name: 'Dark' }).click()
+  const appearanceSettings = await openSettings(page)
+  await appearanceSettings.getByRole('radio', { name: 'Dark', exact: true }).click()
   await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark')
+  await closeSettings(page)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Weather' })).toBeVisible()
-  await expect(page.getByRole('radio', { name: 'Use Dense display mode' })).toBeChecked()
+  const persistedSettings = await openSettings(page)
+  await expect(persistedSettings.getByRole('radio', { name: 'Dense', exact: true })).toBeChecked()
+  await closeSettings(page)
 
   const denseFit = await page.evaluate(() => ({
     documentHeight: document.documentElement.scrollHeight <= document.documentElement.clientHeight,
@@ -398,6 +497,147 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
     path: testInfo.outputPath(`${testInfo.project.name}-dense.png`),
     fullPage: true,
   })
+})
+
+test('Settings stages and confirms bookmark changes in a contained modal', async ({
+  page,
+}, testInfo) => {
+  let currentDocument = structuredClone(defaultBookmarkDocument)
+  let putRequest:
+    | {
+        headers: Record<string, string>
+        body: { baseRevision: string; document: typeof defaultBookmarkDocument }
+      }
+    | undefined
+  await page.route('**/api/bookmarks/document', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const body = route.request().postDataJSON() as {
+        baseRevision: string
+        document: typeof defaultBookmarkDocument
+      }
+      putRequest = { headers: await route.request().allHeaders(), body }
+      currentDocument = body.document
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'cache-control': 'no-store' },
+        body: JSON.stringify(bookmarkDocumentResponse(currentDocument, 'b')),
+      })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'cache-control': 'no-store' },
+      body: JSON.stringify(bookmarkDocumentResponse(currentDocument)),
+    })
+  })
+
+  const refreshedSources: string[] = []
+  let watchSources = false
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (
+      watchSources &&
+      ['/api/weather', '/api/bookmarks', '/api/ebird/summary', '/api/llmdash/summary'].includes(
+        path,
+      )
+    ) {
+      refreshedSources.push(path)
+    }
+  })
+
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
+  const dialog = await openSettings(page)
+  await expect(dialog.getByLabel('Section name').first()).toHaveValue('Daily')
+  await expect(dialog).toHaveAccessibleDescription(
+    /View and appearance stay on this browser.*every device connected through your tailnet/,
+  )
+  await expect(dialog).toHaveAttribute('aria-modal', 'true')
+  await expect(page.getByRole('main')).toHaveCount(0)
+  await expect(page.locator('main')).toHaveCount(1)
+  await expect(page.locator('.shell')).toHaveAttribute('aria-hidden', 'true')
+  await expect(page.locator('.shell')).toHaveAttribute('inert', '')
+  expect(await page.locator('body').getAttribute('data-scroll-locked')).not.toBeNull()
+
+  const modalLayout = await dialog.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const header = element.querySelector<HTMLElement>('.settings-header')!.getBoundingClientRect()
+    const footer = element.querySelector<HTMLElement>('.settings-footer')!.getBoundingClientRect()
+    return {
+      left: bounds.left,
+      right: bounds.right,
+      top: bounds.top,
+      bottom: bounds.bottom,
+      headerVisible: header.top >= bounds.top && header.bottom <= bounds.bottom,
+      footerVisible: footer.top >= bounds.top && footer.bottom <= bounds.bottom,
+      documentWidth: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    }
+  })
+  expect(modalLayout.left).toBeGreaterThanOrEqual(0)
+  expect(modalLayout.right).toBeLessThanOrEqual(
+    testInfo.project.name === 'mobile-chromium' ? 360 : 1440,
+  )
+  expect(modalLayout.top).toBeGreaterThanOrEqual(0)
+  expect(modalLayout.bottom).toBeLessThanOrEqual(
+    testInfo.project.name === 'mobile-chromium' ? 800 : 900,
+  )
+  expect(modalLayout).toMatchObject({
+    headerVisible: true,
+    footerVisible: true,
+    documentWidth: true,
+  })
+
+  await page.locator('.settings-overlay').click({ position: { x: 4, y: 4 }, force: true })
+  await expect(dialog).toBeVisible()
+  for (let index = 0; index < 20; index += 1) await page.keyboard.press('Tab')
+  expect(
+    await page.evaluate(() => Boolean(document.activeElement?.closest('.settings-dialog'))),
+  ).toBe(true)
+
+  const dailyName = dialog.getByLabel('Section name').first()
+  await dailyName.fill('Morning')
+  const moveProjects = dialog.getByRole('button', { name: 'Move section Projects up' })
+  await moveProjects.click()
+  await expect(moveProjects).toBeFocused()
+  await dialog.getByRole('button', { name: 'Add section' }).click()
+  const emptySection = dialog.getByLabel('Section name').last()
+  await expect(emptySection).toBeFocused()
+  await emptySection.fill('Empty saved')
+
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  const discard = page.getByRole('dialog', { name: 'Discard bookmark changes?' })
+  await expect(discard).toBeVisible()
+  await discard.getByRole('button', { name: 'Keep editing' }).click()
+  await expect(dialog).toBeVisible()
+
+  watchSources = true
+  await dialog.getByRole('button', { name: 'Save bookmarks' }).click()
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
+  await expect(page.getByRole('main')).toBeVisible()
+  await expect(page.locator('.shell')).not.toHaveAttribute('aria-hidden', 'true')
+  await expect(page.locator('.shell')).not.toHaveAttribute('inert', '')
+  await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused()
+  await expect(page.getByText('Bookmarks saved.')).toBeVisible()
+  expect(putRequest?.headers['x-homedash-bookmark-write']).toBe('1')
+  expect(putRequest?.body.baseRevision).toBe(`sha256:${'a'.repeat(64)}`)
+  expect(putRequest?.body.document.sections.map((section) => section.name)).toEqual([
+    'Projects',
+    'Morning',
+    'Birding',
+    'Empty saved',
+  ])
+  expect(JSON.stringify(putRequest?.body)).not.toContain('section-')
+  expect(JSON.stringify(putRequest?.body)).not.toContain('bookmark-')
+  expect(refreshedSources).toEqual([])
+  await expect(page.getByRole('heading', { name: 'Empty saved' })).toBeVisible()
+  await expect(page.getByText('No bookmarks')).toBeVisible()
+  await expect(page.getByText('58°').first()).toBeVisible()
+
+  const reopened = await openSettings(page)
+  await expect(reopened.getByLabel('Section name').last()).toHaveValue('Empty saved')
+  await closeSettings(page)
 })
 
 test('saved readings paint before independent refreshes settle and survive a failed source', async ({
@@ -470,7 +710,7 @@ test('saved readings paint before independent refreshes settle and survive a fai
     expect(retryBounds.height).toBeGreaterThanOrEqual(44)
   }
 
-  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await selectMode(page, 'Dense')
   await expect(page.getByText('58°').first()).toBeVisible()
   await expect(page.getByRole('status', { name: /Refreshing/ })).toHaveCount(2)
   await expect(page.getByRole('status', { name: /Refresh failed/ })).toBeVisible()
@@ -513,7 +753,7 @@ test('a poisoned bookmark snapshot renders no link before a valid live response'
   gate.release()
   const liveBookmark = page.getByRole('link', { name: 'Gmail' })
   await expect(liveBookmark).toHaveAttribute('href', 'https://mail.google.com')
-  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await selectMode(page, 'Dense')
   await expect(liveBookmark).toHaveAttribute('href', 'https://mail.google.com')
 })
 
@@ -529,7 +769,7 @@ test('a valid cached HTTP(S) bookmark renders unchanged in Dawn and Dense', asyn
     },
     bookmarkSnapshot([
       {
-        id: 'safe-cached',
+        id: '0123456789abcdef',
         group: 'Daily',
         name: 'Safe cached bookmark',
         url: 'https://example.com/deep?bird=ruff#photos',
@@ -541,7 +781,7 @@ test('a valid cached HTTP(S) bookmark renders unchanged in Dawn and Dense', asyn
   await page.goto('/')
   const cachedBookmark = page.getByRole('link', { name: 'Safe cached bookmark' })
   await expect(cachedBookmark).toHaveAttribute('href', 'https://example.com/deep?bird=ruff#photos')
-  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await selectMode(page, 'Dense')
   await expect(cachedBookmark).toHaveAttribute('href', 'https://example.com/deep?bird=ruff#photos')
 
   gate.release()
@@ -605,10 +845,10 @@ test('Kagi query stays ephemeral, trims on submit, and focus is not reclaimed', 
   const query = page.getByRole('searchbox', { name: 'Kagi' })
   await expect(query).toBeFocused()
   await query.fill('  sandhill crane  ')
-  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await selectMode(page, 'Dense')
   await expect(query).toHaveValue('  sandhill crane  ')
   await expect(page.getByRole('search')).toHaveCount(1)
-  await expect(page.getByRole('radio', { name: 'Use Dense display mode' })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused()
 
   await page.evaluate(() => {
     document
@@ -642,15 +882,17 @@ test('named mobile controls and bookmarks keep their touch baselines', async ({
   await page.goto('/')
   await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
 
-  for (const name of [
-    'Use Dawn display mode',
-    'Use Dense display mode',
-    'System',
-    'Light',
-    'Dark',
-  ]) {
-    await expectTouchTarget(name, page.getByRole('radio', { name, exact: true }))
+  await expectTouchTarget('Settings', page.getByRole('button', { name: 'Settings' }))
+  const settings = await openSettings(page)
+  for (const name of ['Dawn', 'Dense', 'System', 'Light', 'Dark']) {
+    await expectTouchTarget(name, settings.getByRole('radio', { name, exact: true }))
   }
+  await expectTouchTarget('Add section', settings.getByRole('button', { name: 'Add section' }))
+  await expectTouchTarget(
+    'Move Daily down',
+    settings.getByRole('button', { name: 'Move section Daily down' }),
+  )
+  await closeSettings(page)
   for (const name of bookmarkNames) {
     const bookmark = page.getByRole('link', { name, exact: true })
     const bounds = await bookmark.evaluate((element) => {
@@ -661,7 +903,7 @@ test('named mobile controls and bookmarks keep their touch baselines', async ({
     expect(bounds.height, `${name} height`).toBeGreaterThanOrEqual(48)
   }
 
-  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await selectMode(page, 'Dense')
   for (const name of [/Lifers/, /Photo/, /Audio/]) {
     await expectTouchTarget(String(name), page.getByRole('radio', { name }))
   }
@@ -732,15 +974,12 @@ test('favicons stay decorative, same-origin, stable, and inside the release view
     'https://macaulaylibrary.org/',
   ]
   const appearances = ['System', 'Light', 'Dark'] as const
-  const modes = [
-    { name: 'Use Dawn display mode', value: 'dawn' },
-    { name: 'Use Dense display mode', value: 'dense' },
-  ] as const
+  const modes = ['Dawn', 'Dense'] as const
 
   for (const mode of modes) {
-    await page.getByRole('radio', { name: mode.name }).click()
+    await selectMode(page, mode)
     for (const appearance of appearances) {
-      await page.getByRole('radio', { name: appearance, exact: true }).click()
+      await selectAppearance(page, appearance)
       await expect(page.getByRole('link', { name: 'Gmail', exact: true })).toBeVisible()
       const result = await page.evaluate(
         ({ mobile }) => {
@@ -911,7 +1150,13 @@ test('moon phase is shared across the release viewport, mode, and appearance mat
   const apiRequests: string[] = []
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname
-    if (path.startsWith('/api/') && !path.endsWith('/favicon')) apiRequests.push(path)
+    if (
+      path.startsWith('/api/') &&
+      !path.endsWith('/favicon') &&
+      path !== '/api/bookmarks/document'
+    ) {
+      apiRequests.push(path)
+    }
   })
 
   await page.goto('/')
@@ -1008,25 +1253,21 @@ test('moon phase is shared across the release viewport, mode, and appearance mat
   }
 
   const setMode = async (mode: 'dawn' | 'dense') => {
-    await page
-      .getByRole('radio', {
-        name: mode === 'dawn' ? 'Use Dawn display mode' : 'Use Dense display mode',
-      })
-      .click()
+    await selectMode(page, mode === 'dawn' ? 'Dawn' : 'Dense')
     await assertPhaseAndFit(mode)
   }
 
   await assertPhaseAndFit('dawn')
   await setMode('dense')
-  await page.getByRole('radio', { name: 'Light', exact: true }).click()
+  await selectAppearance(page, 'Light')
   await assertPhaseAndFit('dense')
   await setMode('dawn')
-  await page.getByRole('radio', { name: 'Dark', exact: true }).click()
+  await selectAppearance(page, 'Dark')
   await assertPhaseAndFit('dawn')
   await setMode('dense')
 
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
-  await page.getByRole('radio', { name: 'System', exact: true }).click()
+  await selectAppearance(page, 'System')
   await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark')
   await assertPhaseAndFit('dense')
   await setMode('dawn')
@@ -1073,7 +1314,7 @@ test('moon phase survives first-load and unavailable weather without becoming a 
     page.getByRole('status', { name: 'Asking Open-Meteo for the latest reading…' }),
   ).toBeVisible()
 
-  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await selectMode(page, 'Dense')
   await expect(page.getByText('Full moon', { exact: true })).toBeVisible()
   await expect(page.getByRole('status', { name: 'Reading weather…' })).toBeVisible()
 
@@ -1083,7 +1324,7 @@ test('moon phase survives first-load and unavailable weather without becoming a 
   await expect(page.locator('.dense-phase')).not.toHaveAttribute('aria-busy')
   await expect(page.getByText(/of 4 sources/)).toBeVisible()
 
-  await page.getByRole('radio', { name: 'Use Dawn display mode' }).click()
+  await selectMode(page, 'Dawn')
   await expect(page.getByText('Weather could not be reached.')).toBeVisible()
   await expect(page.getByText('Full moon', { exact: true })).toBeVisible()
 })
@@ -1101,7 +1342,7 @@ test('invalid device time omits lunar output while solar and weather content rem
   await expect(page.getByText('58°').first()).toBeVisible()
   await expect(page.getByText(/Sunrise/).first()).toBeVisible()
 
-  await page.getByRole('radio', { name: 'Use Dense display mode' }).click()
+  await selectMode(page, 'Dense')
   await expect(page.locator('.moon-phase, .dense-phase')).toHaveCount(0)
   await expect(page.getByText('58°').first()).toBeVisible()
   await expect(page.getByText(/daylight 12h 49m/)).toBeVisible()

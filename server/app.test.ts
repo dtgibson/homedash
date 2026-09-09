@@ -26,6 +26,7 @@ function testConfig(bookmarksPath: string, llmdashLaunchUrl?: string) {
   return loadConfig({
     HOMEDASH_HOST: '127.0.0.1',
     HOMEDASH_PORT: '1910',
+    HOMEDASH_ALLOWED_ORIGINS: 'http://127.0.0.1:1910,https://home.example.ts.net:1910',
     SNOWRAVEN_URL: 'http://127.0.0.1:1620',
     LLMDASH_URL: 'http://127.0.0.1:8787',
     ...(llmdashLaunchUrl === undefined ? {} : { LLMDASH_LAUNCH_URL: llmdashLaunchUrl }),
@@ -383,4 +384,511 @@ describe('Fastify application boundary', () => {
       expect(response.body).not.toContain('evil.invalid')
     },
   )
+})
+
+const editableDocument = {
+  schemaVersion: 1 as const,
+  sections: [
+    {
+      name: 'Daily',
+      bookmarks: [{ name: 'First', url: 'https://first.example/' }],
+    },
+  ],
+}
+
+async function documentApp() {
+  const dir = await mkdtemp(path.join(tmpdir(), 'homedash-document-api-'))
+  const bookmarksPath = path.join(dir, 'bookmarks.json')
+  await writeFile(bookmarksPath, JSON.stringify(editableDocument))
+  const app = await buildApp({ config: testConfig(bookmarksPath), serveClient: false })
+  apps.push(app)
+  return { app, bookmarksPath }
+}
+
+function mutationHeaders(overrides: Record<string, string> = {}) {
+  return {
+    host: '127.0.0.1:1910',
+    'content-type': 'application/json',
+    'x-homedash-bookmark-write': '1',
+    ...overrides,
+  }
+}
+
+describe('bookmark document API boundary', () => {
+  it('returns a fresh strict editable document without caching or rewriting source bytes', async () => {
+    const legacy = [
+      { group: 'Daily', name: 'First', url: 'https://first.example/' },
+      { group: 'Projects', name: 'Code', url: 'https://code.example/' },
+      { group: 'Daily', name: 'Second', url: 'https://second.example/' },
+    ]
+    const dir = await mkdtemp(path.join(tmpdir(), 'homedash-document-get-'))
+    const bookmarksPath = path.join(dir, 'bookmarks.json')
+    const original = JSON.stringify(legacy, null, 2)
+    await writeFile(bookmarksPath, original)
+    const app = await buildApp({ config: testConfig(bookmarksPath), serveClient: false })
+    apps.push(app)
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers: { host: '127.0.0.1:1910' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.headers['content-type']).toMatch(/^application\/json/)
+    expect(response.headers).toMatchObject(expectedSecurityHeaders)
+    expect(response.json()).toMatchObject({
+      schemaVersion: 1,
+      revision: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+      document: {
+        schemaVersion: 1,
+        sections: [
+          {
+            name: 'Daily',
+            bookmarks: [
+              { name: 'First', url: 'https://first.example/' },
+              { name: 'Second', url: 'https://second.example/' },
+            ],
+          },
+          {
+            name: 'Projects',
+            bookmarks: [{ name: 'Code', url: 'https://code.example/' }],
+          },
+        ],
+      },
+    })
+    expect(
+      await import('node:fs/promises').then(({ readFile }) => readFile(bookmarksPath, 'utf8')),
+    ).toBe(original)
+  })
+
+  it('keeps partial legacy content available to the dashboard while the editor stays read-only', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'homedash-document-partial-'))
+    const bookmarksPath = path.join(dir, 'bookmarks.json')
+    await writeFile(
+      bookmarksPath,
+      JSON.stringify([
+        { group: 'Daily', name: 'Good', url: 'https://good.example/' },
+        { group: 'Daily', name: '', url: 'javascript:alert(1)' },
+      ]),
+    )
+    const app = await buildApp({ config: testConfig(bookmarksPath), serveClient: false })
+    apps.push(app)
+
+    const dashboard = await app.inject({ method: 'GET', url: '/api/bookmarks' })
+    const editor = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers: { host: '127.0.0.1:1910' },
+    })
+
+    expect(dashboard.statusCode).toBe(200)
+    expect(dashboard.json().data).toMatchObject({ invalidEntryCount: 1 })
+    expect(editor.statusCode).toBe(409)
+    expect(editor.headers['cache-control']).toBe('no-store')
+    expect(editor.json()).toEqual({
+      schemaVersion: 1,
+      code: 'bookmark-source-invalid',
+      message: 'The bookmark file is not valid for editing.',
+      retryable: false,
+    })
+    expect(editor.body).not.toContain('javascript')
+    expect(editor.body).not.toContain(bookmarksPath)
+  })
+
+  it('replaces the complete document and returns the authoritative display projection', async () => {
+    const { app, bookmarksPath } = await documentApp()
+    const get = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers: { host: '127.0.0.1:1910' },
+    })
+    const candidate = {
+      schemaVersion: 1,
+      sections: [
+        { name: 'Empty', bookmarks: [] },
+        {
+          name: 'Later',
+          bookmarks: [{ name: 'Third', url: 'https://third.example/' }],
+        },
+      ],
+    }
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders({ origin: 'http://127.0.0.1:1910' }),
+      payload: {
+        schemaVersion: 1,
+        baseRevision: get.json().revision,
+        document: candidate,
+      },
+    })
+
+    expect(put.statusCode).toBe(200)
+    expect(put.headers['cache-control']).toBe('no-store')
+    expect(put.json()).toMatchObject({
+      document: candidate,
+      display: {
+        data: {
+          sections: ['Empty', 'Later'],
+          bookmarks: [{ group: 'Later', name: 'Third', order: 0 }],
+          invalidEntryCount: 0,
+        },
+      },
+    })
+    expect(
+      JSON.parse(
+        await import('node:fs/promises').then(({ readFile }) => readFile(bookmarksPath, 'utf8')),
+      ),
+    ).toEqual(candidate)
+  })
+
+  it('enforces whole-document conflicts while accepting an exact idempotent replay', async () => {
+    const { app } = await documentApp()
+    const base = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers: { host: '127.0.0.1:1910' },
+    })
+    const candidate = {
+      schemaVersion: 1,
+      sections: [{ name: 'New', bookmarks: [] }],
+    }
+    const body = {
+      schemaVersion: 1,
+      baseRevision: base.json().revision,
+      document: candidate,
+    }
+
+    const first = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: body,
+    })
+    const staleDifferent = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: { ...body, document: editableDocument },
+    })
+    const idempotent = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: body,
+    })
+
+    expect(first.statusCode).toBe(200)
+    expect(staleDifferent.statusCode).toBe(409)
+    expect(staleDifferent.json()).toMatchObject({
+      code: 'bookmark-revision-conflict',
+      retryable: false,
+    })
+    expect(idempotent.statusCode).toBe(200)
+    expect(idempotent.json().revision).toBe(first.json().revision)
+  })
+
+  it('returns every applicable candidate field error without writing partial content', async () => {
+    const { app, bookmarksPath } = await documentApp()
+    const base = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers: { host: '127.0.0.1:1910' },
+    })
+    const before = await import('node:fs/promises').then(({ readFile }) =>
+      readFile(bookmarksPath, 'utf8'),
+    )
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: {
+        schemaVersion: 1,
+        baseRevision: base.json().revision,
+        document: {
+          schemaVersion: 1,
+          sections: [
+            {
+              name: 'Daily',
+              bookmarks: [{ name: '', url: 'javascript:alert(1)', 'private-session-key': true }],
+            },
+            { name: ' daily ', bookmarks: [] },
+          ],
+        },
+      },
+    })
+
+    expect(response.statusCode).toBe(422)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json().fieldErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '/document/sections/0/bookmarks/0',
+          code: 'unknown-property',
+        }),
+        expect.objectContaining({
+          path: '/document/sections/0/bookmarks/0/name',
+          code: 'required',
+        }),
+        expect.objectContaining({
+          path: '/document/sections/0/bookmarks/0/url',
+          code: 'invalid-url',
+        }),
+        expect.objectContaining({ path: '/document/sections/0/name', code: 'duplicate' }),
+        expect.objectContaining({ path: '/document/sections/1/name', code: 'duplicate' }),
+      ]),
+    )
+    expect(response.body).not.toContain('javascript')
+    expect(response.body).not.toContain('private-session-key')
+    expect(
+      await import('node:fs/promises').then(({ readFile }) => readFile(bookmarksPath, 'utf8')),
+    ).toBe(before)
+  })
+
+  it.each([
+    {
+      name: 'missing write marker',
+      headers: { host: '127.0.0.1:1910', 'content-type': 'application/json' },
+      expectedStatus: 403,
+      expectedCode: 'bookmark-request-forbidden',
+    },
+    {
+      name: 'cross-origin Origin',
+      headers: mutationHeaders({ origin: 'https://evil.invalid' }),
+      expectedStatus: 403,
+      expectedCode: 'bookmark-request-forbidden',
+    },
+    {
+      name: 'cross-site fetch metadata',
+      headers: mutationHeaders({ 'sec-fetch-site': 'cross-site' }),
+      expectedStatus: 403,
+      expectedCode: 'bookmark-request-forbidden',
+    },
+    {
+      name: 'unsupported media type',
+      headers: {
+        host: '127.0.0.1:1910',
+        'content-type': 'text/plain',
+        'x-homedash-bookmark-write': '1',
+      },
+      expectedStatus: 415,
+      expectedCode: 'bookmark-media-type-unsupported',
+    },
+    {
+      name: 'compressed body',
+      headers: mutationHeaders({ 'content-encoding': 'gzip' }),
+      expectedStatus: 415,
+      expectedCode: 'bookmark-media-type-unsupported',
+    },
+  ])('rejects $name before mutation with the editor error contract', async (testCase) => {
+    const { app, bookmarksPath } = await documentApp()
+    const before = await import('node:fs/promises').then(({ readFile }) =>
+      readFile(bookmarksPath, 'utf8'),
+    )
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: testCase.headers,
+      payload: '{}',
+    })
+
+    expect(response.statusCode).toBe(testCase.expectedStatus)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json()).toMatchObject({
+      schemaVersion: 1,
+      code: testCase.expectedCode,
+      retryable: false,
+    })
+    expect(
+      await import('node:fs/promises').then(({ readFile }) => readFile(bookmarksPath, 'utf8')),
+    ).toBe(before)
+  })
+
+  it('allows exact configured Tailscale Host and Origin without trusting forwarding headers', async () => {
+    const { app } = await documentApp()
+    const base = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers: { host: 'home.example.ts.net:1910' },
+    })
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders({
+        host: 'home.example.ts.net:1910',
+        origin: 'https://home.example.ts.net:1910',
+        'x-forwarded-proto': 'http',
+        'x-forwarded-host': 'attacker.invalid',
+        'sec-fetch-site': 'same-origin',
+      }),
+      payload: {
+        schemaVersion: 1,
+        baseRevision: base.json().revision,
+        document: editableDocument,
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+  })
+
+  it('rejects attacker Hosts for GET and PUT despite matching origins and spoofed forwarding', async () => {
+    const { app } = await documentApp()
+    const headers = {
+      host: 'attacker.invalid',
+      origin: 'https://attacker.invalid',
+      'x-forwarded-proto': 'https',
+      'x-forwarded-host': 'home.example.ts.net:1910',
+      'sec-fetch-site': 'same-origin',
+    }
+    const get = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers,
+    })
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(headers),
+      payload: '{}',
+    })
+
+    for (const response of [get, put]) {
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toMatchObject({ code: 'bookmark-request-forbidden' })
+    }
+  })
+
+  it('rejects a supplied GET Origin that is not the configured origin for its Host', async () => {
+    const { app } = await documentApp()
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers: {
+        host: '127.0.0.1:1910',
+        origin: 'https://attacker.invalid',
+        'sec-fetch-site': 'cross-site',
+      },
+    })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.json()).toMatchObject({ code: 'bookmark-request-forbidden' })
+  })
+
+  it('bounds public field errors and every public error path', async () => {
+    const { app } = await documentApp()
+    const base = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document',
+      headers: { host: '127.0.0.1:1910' },
+    })
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: {
+        schemaVersion: 1,
+        baseRevision: base.json().revision,
+        document: {
+          schemaVersion: 1,
+          sections: [
+            {
+              name: 'Daily',
+              bookmarks: Array.from({ length: 101 }, (_, index) => ({
+                name: '',
+                url: 'invalid',
+                [`sensitive-${index}`]: true,
+              })),
+            },
+          ],
+        },
+      },
+    })
+
+    expect(response.statusCode).toBe(422)
+    const fieldErrors = response.json().fieldErrors as Array<{ path: string }>
+    expect(fieldErrors).toHaveLength(128)
+    expect(fieldErrors.every((error) => error.path.length <= 160)).toBe(true)
+    expect(response.body).not.toContain('sensitive-')
+  })
+
+  it.each([
+    ['GET', '/api/bookmarks/document?revision=private', 404],
+    ['POST', '/api/bookmarks/document', 405],
+    ['HEAD', '/api/bookmarks/document', 405],
+    ['GET', '/api/bookmarks/document/extra', 404],
+  ] as const)('reserves the exact document route: %s %s', async (method, url, statusCode) => {
+    const { app } = await documentApp()
+    const response = await app.inject({ method, url })
+    expect(response.statusCode).toBe(statusCode)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json()).toMatchObject({
+      schemaVersion: 1,
+      code: 'bookmark-request-invalid',
+    })
+    expect(response.body).not.toContain('private')
+  })
+
+  it('maps malformed wrappers, malformed JSON, and bounded oversized bodies safely', async () => {
+    const { app } = await documentApp()
+
+    const wrapper = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: { schemaVersion: 1, document: editableDocument, extra: true },
+    })
+    const malformed = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: '{not json',
+    })
+    const underRouteLimit = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: JSON.stringify({ extra: 'x'.repeat(40_000) }),
+    })
+    const overRouteLimit = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/document',
+      headers: mutationHeaders(),
+      payload: JSON.stringify({ extra: 'x'.repeat(66_000) }),
+    })
+
+    expect(wrapper.statusCode).toBe(400)
+    expect(malformed.statusCode).toBe(400)
+    expect(underRouteLimit.statusCode).toBe(400)
+    expect(overRouteLimit.statusCode).toBe(413)
+    for (const response of [wrapper, malformed, underRouteLimit, overRouteLimit]) {
+      expect(response.headers['cache-control']).toBe('no-store')
+      expect(response.json()).toMatchObject({ schemaVersion: 1 })
+      expect(response.body).not.toContain('FST_ERR')
+      expect(response.body).not.toContain('x'.repeat(100))
+    }
+  })
+
+  it('keeps the favicon namespace behavior separate from document errors', async () => {
+    const { app } = await documentApp()
+    const documentResponse = await app.inject({
+      method: 'GET',
+      url: '/api/bookmarks/document?bad=private',
+    })
+    const faviconResponse = await app.inject({
+      method: 'PUT',
+      url: '/api/bookmarks/ffffffffffffffff/favicon',
+    })
+
+    expect(documentResponse.statusCode).toBe(404)
+    expect(documentResponse.headers['content-type']).toMatch(/^application\/json/)
+    expect(documentResponse.json().code).toBe('bookmark-request-invalid')
+    expect(faviconResponse.statusCode).toBe(404)
+    expect(faviconResponse.body).toBe('')
+    expect(faviconResponse.headers['cache-control']).toBe('no-store')
+  })
 })

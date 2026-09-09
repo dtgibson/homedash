@@ -5,6 +5,7 @@ import {
   ebirdEnvelopeSchema,
   llmdashEnvelopeSchema,
   weatherEnvelopeSchema,
+  storedBookmarksEnvelopeSchema,
   type ApiMeta,
   type BookmarksEnvelope,
   type EbirdEnvelope,
@@ -86,7 +87,10 @@ function staleCopy<T extends { meta: ApiMeta }>(value: T, failureMessage?: strin
 }
 
 function hydratedWidget<K extends WidgetName>(name: K): DashboardData[K] {
-  const snapshot = readSnapshot(snapshotKeys[name], schemas[name] as z.ZodType)
+  const snapshot = readSnapshot(
+    snapshotKeys[name],
+    (name === 'bookmarks' ? storedBookmarksEnvelopeSchema : schemas[name]) as z.ZodType,
+  )
   if (!snapshot || typeof snapshot !== 'object' || !('meta' in snapshot)) {
     return { status: 'loading', data: null, message: null } as DashboardData[K]
   }
@@ -363,6 +367,22 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
     [load, loadLocationWidget, onAnnouncement, selector],
   )
 
+  const acceptSavedBookmarks = useCallback(
+    (value: BookmarksEnvelope) => {
+      const parsed = bookmarksEnvelopeSchema.safeParse(value)
+      if (!parsed.success) return false
+      saveSnapshot(snapshotKeys.bookmarks, parsed.data)
+      setWidget('bookmarks', {
+        status: 'ready',
+        data: parsed.data,
+        message: null,
+        refreshStatus: 'idle',
+      })
+      return true
+    },
+    [setWidget],
+  )
+
   useEffect(() => {
     if (started.current) return
     started.current = true
@@ -387,5 +407,6 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
     retryLocation: chooseLocation,
     retryWidget,
     refreshAll,
+    acceptSavedBookmarks,
   }
 }

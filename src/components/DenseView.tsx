@@ -201,7 +201,11 @@ export function DenseView({ data, moonPhase, category, onCategory, onRetry }: De
             )}
             {bookmarks && (
               <>
-                <BookmarkGroups dense bookmarks={bookmarks.data.bookmarks} />
+                <BookmarkGroups
+                  dense
+                  bookmarks={bookmarks.data.bookmarks}
+                  sections={bookmarks.data.sections}
+                />
               </>
             )}
           </div>

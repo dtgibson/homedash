@@ -236,7 +236,10 @@ export function DawnView({ data, moonPhase, category, onCategory, onRetry }: Vie
             )}
             {bookmarks && (
               <>
-                <BookmarkGroups bookmarks={bookmarks.data.bookmarks} />
+                <BookmarkGroups
+                  bookmarks={bookmarks.data.bookmarks}
+                  sections={bookmarks.data.sections}
+                />
               </>
             )}
           </section>

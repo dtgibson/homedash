@@ -8,6 +8,8 @@ readonly APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 readonly UNIT_PATH="$UNIT_DIR/$APP_NAME.service"
 readonly MANAGED_NODE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/homedash/node"
+readonly STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}"
+readonly BOOKMARK_STATE_DIR="$STATE_ROOT/homedash/bookmarks"
 
 fail() {
   printf 'homedash install failed: %s\n' "$*" >&2
@@ -117,11 +119,34 @@ printf 'Using Node.js %s for homedash at %s.\n' "$($NODE_BIN --version)" "$NODE_
 
 cd "$APP_DIR"
 
+TAILSCALE_ORIGIN=""
+if command -v tailscale >/dev/null 2>&1; then
+  TAILSCALE_DNS_NAME="$(tailscale status --json 2>/dev/null | "$NODE_BIN" --input-type=module -e '
+    let source = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => { source += chunk; });
+    process.stdin.on("end", () => {
+      try {
+        const dnsName = JSON.parse(source).Self?.DNSName;
+        if (typeof dnsName === "string" && /^[a-z0-9.-]+\.$/i.test(dnsName)) {
+          process.stdout.write(dnsName.slice(0, -1).toLowerCase());
+        }
+      } catch {}
+    });
+  ' || true)"
+  if [[ -n "$TAILSCALE_DNS_NAME" ]]; then
+    TAILSCALE_ORIGIN=",https://$TAILSCALE_DNS_NAME:$APP_PORT"
+  fi
+fi
+readonly TAILSCALE_ORIGIN
+readonly DEFAULT_ALLOWED_ORIGINS="http://127.0.0.1:$APP_PORT$TAILSCALE_ORIGIN"
+
 if [[ ! -f .env ]]; then
   umask 077
   cat >.env <<EOF
 HOMEDASH_HOST=127.0.0.1
 HOMEDASH_PORT=$APP_PORT
+HOMEDASH_ALLOWED_ORIGINS=$DEFAULT_ALLOWED_ORIGINS
 
 SNOWRAVEN_URL=${SNOWRAVEN_URL:-http://127.0.0.1:1620}
 LLMDASH_URL=${LLMDASH_URL:-http://127.0.0.1:8787}
@@ -135,21 +160,54 @@ WEATHER_UNIT=fahrenheit
 EBIRD_RADIUS_KM=50
 EBIRD_WINDOW_DAYS=14
 EBIRD_TARGET_LIMIT=5
-BOOKMARKS_PATH=./config/bookmarks.json
+BOOKMARKS_PATH=$BOOKMARK_STATE_DIR/bookmarks.json
 EOF
   printf 'Created private configuration at %s/.env.\n' "$APP_DIR"
 else
   printf 'Preserving existing private configuration at %s/.env.\n' "$APP_DIR"
+  if ! grep -Eq '^[[:space:]]*HOMEDASH_ALLOWED_ORIGINS=' .env; then
+    printf '\nHOMEDASH_ALLOWED_ORIGINS=%s\n' "$DEFAULT_ALLOWED_ORIGINS" >>.env
+    printf 'Added exact loopback and installed Tailscale origins to private configuration.\n'
+  fi
 fi
 
-if [[ ! -f config/bookmarks.json ]]; then
-  install -m 600 config/bookmarks.example.json config/bookmarks.json
-  printf 'Created bookmarks at %s/config/bookmarks.json.\n' "$APP_DIR"
+BOOKMARKS_FILE="$($NODE_BIN --input-type=module -e '
+  import { readFileSync } from "node:fs";
+  import { isAbsolute, resolve } from "node:path";
+  import { parseEnv } from "node:util";
+
+  const configured = parseEnv(readFileSync(".env", "utf8")).BOOKMARKS_PATH;
+  if (!configured || configured.includes("\0") || configured.includes("\n") || configured.includes("\r")) {
+    process.exit(1);
+  }
+  process.stdout.write(isAbsolute(configured) ? resolve(configured) : resolve(process.cwd(), configured));
+')" || fail "BOOKMARKS_PATH in .env must be a valid non-empty path."
+readonly BOOKMARKS_FILE
+readonly BOOKMARKS_PARENT="$(dirname "$BOOKMARKS_FILE")"
+
+"$NODE_BIN" scripts/validate-bookmark-path.mjs \
+  "$APP_DIR" "$HOME" "$UNIT_DIR" "$STATE_ROOT" "$BOOKMARKS_FILE" ||
+  fail "BOOKMARKS_PATH must use a dedicated, non-sensitive state directory."
+
+if [[ ! -e "$BOOKMARKS_FILE" ]]; then
+  install -d -m 700 "$BOOKMARKS_PARENT"
+  install -m 600 config/bookmarks.example.json "$BOOKMARKS_FILE"
+  printf 'Created bookmarks at %s.\n' "$BOOKMARKS_FILE"
+elif [[ -f "$BOOKMARKS_FILE" && ! -L "$BOOKMARKS_FILE" ]]; then
+  printf 'Preserving existing bookmarks at %s.\n' "$BOOKMARKS_FILE"
 else
-  printf 'Preserving existing bookmarks at %s/config/bookmarks.json.\n' "$APP_DIR"
+  fail "BOOKMARKS_PATH must select a regular, non-symlink file."
 fi
 
-chmod 600 .env config/bookmarks.json
+chmod 600 .env "$BOOKMARKS_FILE"
+if [[ "$BOOKMARKS_FILE" != "$APP_DIR/config/bookmarks.json" ]]; then
+  chmod 700 "$BOOKMARKS_PARENT"
+fi
+
+SYSTEMD_BOOKMARKS_PARENT="${BOOKMARKS_PARENT//\\/\\\\}"
+SYSTEMD_BOOKMARKS_PARENT="${SYSTEMD_BOOKMARKS_PARENT//\"/\\\"}"
+SYSTEMD_BOOKMARKS_PARENT="${SYSTEMD_BOOKMARKS_PARENT//%/%%}"
+readonly SYSTEMD_BOOKMARKS_PARENT
 
 printf 'Installing exact dependencies, running checks, and building production assets…\n'
 "$NPM_BIN" ci
@@ -174,6 +232,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
+ReadWritePaths="$SYSTEMD_BOOKMARKS_PARENT"
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictSUIDSGID=true
 LockPersonality=true
@@ -217,5 +276,5 @@ fi
 
 printf '\nhomedash is installed and healthy.\n'
 printf 'Private settings: %s/.env\n' "$APP_DIR"
-printf 'Bookmarks: %s/config/bookmarks.json\n' "$APP_DIR"
+printf 'Bookmarks: %s\n' "$BOOKMARKS_FILE"
 printf 'Future updates use the same one-line command.\n'

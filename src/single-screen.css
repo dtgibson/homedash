@@ -1043,7 +1043,7 @@ a.target-item:hover strong {
 
   .dawn-composition {
     grid-template-columns: 1fr;
-    grid-template-rows: 117px minmax(257px, 1fr) 157px;
+    grid-template-rows: 119px minmax(257px, 1fr) 157px;
     height: calc(100% - 60px);
   }
 
@@ -1325,6 +1325,10 @@ a.target-item:hover strong {
     gap: 2px 5px;
   }
 
+  .bookmark-scroll {
+    padding-block: 4px;
+  }
+
   .bookmark-group h3 {
     margin: 0;
     padding-bottom: 1px;
@@ -1575,5 +1579,732 @@ a.target-item:hover strong {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Settings is the one transient work surface; the dashboard stays composed beneath it. */
+.settings-button {
+  flex: none;
+}
+
+.settings-overlay,
+.confirmation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--ground-deep) 70%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.settings-overlay[data-state='open'] {
+  animation: settings-scrim-in 160ms ease-out;
+}
+
+.settings-overlay[data-state='closed'] {
+  animation: settings-scrim-out 120ms ease-in;
+}
+
+.settings-dialog {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  bottom: 24px;
+  z-index: 51;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(960px, calc(100vw - 48px));
+  max-width: 960px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  box-shadow: 0 14px 38px var(--shadow);
+  transform-origin: top right;
+}
+
+.settings-dialog[data-state='open'] {
+  animation: settings-window-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.settings-dialog[data-state='closed'] {
+  animation: settings-window-out 120ms ease-in;
+}
+
+.settings-header,
+.settings-footer {
+  position: relative;
+  z-index: 1;
+  background: var(--surface-raised);
+}
+
+.settings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.settings-header h2,
+.confirmation-dialog h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.settings-header p {
+  max-width: 68ch;
+  margin: 7px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-close,
+.small-action,
+.add-action,
+.text-action,
+.cancel-action,
+.save-action,
+.confirm-action {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.settings-close:hover,
+.small-action:hover:not(:disabled):not([aria-disabled='true']),
+.add-action:hover:not(:disabled),
+.text-action:hover:not(:disabled),
+.cancel-action:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--gold-wash);
+}
+
+.settings-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 0 11px;
+}
+
+.settings-close svg,
+.small-action svg,
+.add-action svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.settings-body {
+  display: grid;
+  grid-template-columns: 244px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.browser-preferences,
+.bookmark-editor {
+  min-width: 0;
+  padding: 24px 22px 32px;
+}
+
+.browser-preferences {
+  border-right: 1px solid var(--line-strong);
+}
+
+.settings-scope,
+.preference-group h3,
+.editor-field > span:first-child,
+.section-order,
+.section-editor-tail > span,
+.add-section-row > span,
+.settings-footer p {
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.settings-scope {
+  margin: 0 0 7px;
+}
+
+.browser-preferences h2,
+.editor-intro h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.browser-preferences > p:not(.settings-scope),
+.editor-intro > p {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.preference-group {
+  margin-top: 28px;
+}
+
+.preference-group h3 {
+  margin: 0 0 9px;
+}
+
+.settings-toggle-group {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+}
+
+.settings-toggle-group button {
+  position: relative;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.settings-toggle-group button:last-child {
+  border-right: 0;
+}
+
+.settings-toggle-group button:hover,
+.settings-toggle-group button[data-state='on'] {
+  color: var(--ink);
+  background: var(--gold-wash);
+}
+
+.settings-toggle-group button[data-state='on'] {
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+
+.editor-intro {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 22px;
+  padding-bottom: 19px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.editor-intro > p {
+  max-width: 28ch;
+  text-align: right;
+}
+
+.editor-load-state,
+.empty-editor {
+  min-height: 230px;
+  padding: 34px 0;
+  color: var(--ink-soft);
+}
+
+.editor-load-state h3,
+.empty-editor h3 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.editor-load-state p,
+.empty-editor p {
+  max-width: 52ch;
+  margin: 8px 0 18px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.editor-load-state > span {
+  display: block;
+  width: 84%;
+  height: 9px;
+  margin-top: 12px;
+  background: var(--line);
+}
+
+.editor-load-state > span:nth-last-child(2) {
+  width: 68%;
+  opacity: 0.72;
+}
+
+.editor-load-state > span:last-child {
+  width: 42%;
+  opacity: 0.46;
+}
+
+.editor-status,
+.editor-error-summary {
+  display: grid;
+  gap: 5px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--danger);
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+  font-size: 11px;
+  line-height: 1.45;
+  animation: editor-status-in 140ms ease-out;
+}
+
+.editor-status strong,
+.editor-error-summary strong {
+  color: var(--ink);
+}
+
+.status-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 7px;
+}
+
+.text-action {
+  padding: 0 10px;
+}
+
+.bookmark-section-list {
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.bookmark-section-editor {
+  padding: 18px 0 0;
+  border-top: 1px solid var(--line-strong);
+  transition: border-color 150ms ease-out;
+}
+
+.bookmark-section-editor:first-child {
+  border-top: 0;
+}
+
+.section-editor-head {
+  display: grid;
+  grid-template-columns: 30px minmax(180px, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.section-order {
+  padding-top: 29px;
+}
+
+.editor-field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.editor-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.35;
+  transition:
+    color 140ms ease-out,
+    border-color 140ms ease-out,
+    background-color 140ms ease-out;
+}
+
+.editor-field input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 10px;
+  line-height: 1.4;
+  animation: editor-status-in 140ms ease-out;
+}
+
+.row-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.small-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.small-action:disabled,
+.small-action[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.remove-action {
+  color: var(--danger);
+}
+
+.section-bookmarks {
+  margin: 16px 0 0 42px;
+  border-left: 1px solid var(--line);
+}
+
+.bookmark-editor-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(210px, 1.2fr);
+  gap: 10px 12px;
+  padding: 14px 0 14px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.bookmark-editor-row:first-child {
+  border-top: 0;
+}
+
+.bookmark-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+}
+
+.empty-section-copy {
+  margin: 0;
+  padding: 16px 14px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.section-editor-tail,
+.add-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0 18px 42px;
+}
+
+.add-section-row {
+  padding: 18px 0;
+}
+
+.add-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+}
+
+.settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 66px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.settings-footer p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.settings-footer p.is-dirty {
+  color: var(--gold);
+}
+
+.settings-footer > div,
+.confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cancel-action,
+.save-action,
+.confirm-action {
+  padding: 0 14px;
+}
+
+.save-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-color: var(--gold);
+  color: var(--surface-raised);
+  background: var(--gold);
+}
+
+.save-action:hover:not(:disabled) {
+  border-color: var(--gold-bright);
+  background: var(--gold-bright);
+}
+
+.save-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: turn 280ms linear infinite;
+}
+
+.confirmation-overlay {
+  z-index: 60;
+  background: color-mix(in srgb, var(--ground-deep) 48%, transparent);
+}
+
+.confirmation-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 61;
+  width: min(440px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  box-shadow: 0 14px 38px var(--shadow);
+  transform: translate(-50%, -50%);
+  transform-origin: top right;
+}
+
+.confirmation-dialog[data-state='open'] {
+  animation: confirmation-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.confirmation-dialog p {
+  margin: 12px 0 22px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.confirm-action {
+  border-color: var(--danger);
+  color: var(--surface-raised);
+  background: var(--danger);
+}
+
+.empty-bookmark-section {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+@keyframes settings-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes settings-scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes settings-window-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+}
+
+@keyframes settings-window-out {
+  to {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.99);
+  }
+}
+
+@keyframes confirmation-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 6px)) scale(0.985);
+  }
+}
+
+@keyframes editor-status-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .toolbar-controls .settings-button {
+    width: auto;
+    min-width: 106px;
+    padding-inline: 13px;
+  }
+
+  .toolbar-controls .settings-button span {
+    display: inline;
+  }
+
+  .settings-dialog {
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    border-width: 0;
+    border-radius: 0;
+  }
+
+  .settings-header {
+    padding: 14px 16px 12px;
+  }
+
+  .settings-header h2 {
+    font-size: 30px;
+  }
+
+  .settings-header p {
+    font-size: 10px;
+  }
+
+  .settings-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .browser-preferences,
+  .bookmark-editor {
+    padding: 22px 16px 28px;
+  }
+
+  .browser-preferences {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .settings-toggle-group button,
+  .settings-close,
+  .small-action,
+  .add-action,
+  .text-action,
+  .cancel-action,
+  .save-action,
+  .confirm-action {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .editor-intro {
+    align-items: start;
+  }
+
+  .editor-intro > p {
+    max-width: 17ch;
+    margin-top: 0;
+  }
+
+  .section-editor-head {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .section-order {
+    padding-top: 31px;
+  }
+
+  .section-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .section-bookmarks {
+    margin-left: 0;
+  }
+
+  .bookmark-editor-row {
+    grid-template-columns: minmax(0, 1fr);
+    padding-left: 12px;
+  }
+
+  .bookmark-actions {
+    grid-column: auto;
+    flex-wrap: wrap;
+  }
+
+  .section-editor-tail,
+  .add-section-row {
+    align-items: flex-start;
+    padding-left: 0;
+  }
+
+  .settings-footer {
+    align-items: flex-start;
+    min-height: 76px;
+    padding: 10px 16px;
+  }
+
+  .settings-footer p {
+    max-width: 15ch;
+    font-size: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-dialog,
+  .confirmation-dialog {
+    transform: none;
+  }
+
+  .confirmation-dialog {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
 }

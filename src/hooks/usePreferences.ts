@@ -24,7 +24,7 @@ export function usePreferences() {
 
   const setPreferences = (next: DevicePreferences) => {
     setPreferencesState(next)
-    savePreferences(next)
+    return savePreferences(next)
   }
 
   return { preferences, setPreferences }

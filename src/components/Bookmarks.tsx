@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { Bookmark } from '../shared/contracts'
 
-function groupBookmarks(bookmarks: Bookmark[]) {
+function groupBookmarks(bookmarks: Bookmark[], sections: string[]) {
   const groups = new Map<string, Bookmark[]>()
+  for (const section of sections) groups.set(section, [])
   for (const bookmark of bookmarks) {
     const current = groups.get(bookmark.group) ?? []
     current.push(bookmark)
@@ -14,11 +15,12 @@ function groupBookmarks(bookmarks: Bookmark[]) {
 export function BookmarkFavicon({ bookmarkId }: { bookmarkId: string }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
-  const source = `/api/bookmarks/${encodeURIComponent(bookmarkId)}/favicon`
+  const safeBookmarkId = /^[a-f0-9]{16}$/.test(bookmarkId)
+  const source = safeBookmarkId ? `/api/bookmarks/${bookmarkId}/favicon` : null
 
   return (
     <span className="bookmark-mark" aria-hidden="true">
-      {!failed && (
+      {!failed && source && (
         <img
           className="bookmark-favicon"
           src={source}
@@ -52,13 +54,15 @@ export function BookmarkFavicon({ bookmarkId }: { bookmarkId: string }) {
 
 export function BookmarkGroups({
   bookmarks,
+  sections,
   dense = false,
 }: {
   bookmarks: Bookmark[]
+  sections: string[]
   dense?: boolean
 }) {
-  const groups = groupBookmarks(bookmarks)
-  if (!bookmarks.length) return <p className="empty-copy">No valid bookmarks are configured.</p>
+  const groups = groupBookmarks(bookmarks, sections)
+  if (!sections.length) return <p className="empty-copy">No valid bookmarks are configured.</p>
   return (
     <div className="bookmark-scroll">
       <div className={dense ? 'dense-bookmarks' : 'bookmark-columns'}>
@@ -80,6 +84,7 @@ export function BookmarkGroups({
                 )}
               </a>
             ))}
+            {!links.length && <span className="empty-bookmark-section">No bookmarks</span>}
           </nav>
         ))}
       </div>
