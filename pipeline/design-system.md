@@ -100,8 +100,8 @@ Dawn.
 - Content separators: 1px `--line`; major boundaries: 1px `--line-strong`.
 - Control radius: 4–5px. Avoid fully rounded segmented controls and excessive
   pill shapes.
-- Touch targets: 42px minimum for mobile controls; 44px for mobile links and
-  category targets.
+- Touch targets: 42px minimum for compact mobile controls; 44px for mobile
+  links and category targets; bookmark links use the 48px recognition baseline.
 - Elevation: no default widget shadows. Status toast alone uses
   `0 14px 38px --shadow`.
 - Dawn desktop structure: 12-column flow, weather spans 7 and birding spans 5.
@@ -113,6 +113,10 @@ Dawn.
   widget envelopes. Neither fetches independently, changes source values, or
   reorders data. Switching renderer is instantaneous and preserves current
   state.
+- **Shared action chrome:** Keep one compact search control above the renderer
+  fork and turn existing source context into native links instead of adding
+  button rows or another widget. Host-specific destinations resolve through
+  fixed same-origin actions; a browser never supplies an arbitrary redirect.
 - **Independent appearance:** `system | light | dark` is orthogonal to
   `dawn | dense`. System follows device preference live. Save both per browser;
   never make display density imply palette.
@@ -146,11 +150,24 @@ Dawn.
   supplied remaining percentages, and reset times aligned. Meter width copies
   the supplied remaining percentage. Never infer a missing value or relabel one
   window as another.
-- **Bookmark columns:** Preserve host configuration order inside named groups.
-  Use baseline rhythm and rules, not tiles. Dawn may add a quiet outbound arrow;
-  Dense remains plain text.
+- **Bookmark columns:** Preserve host-document section and bookmark order,
+  including named empty sections. Use baseline rhythm and rules, not tiles;
+  Dawn may add a quiet outbound arrow while Dense remains typographically
+  plainer.
+- **Progressive bookmark recognition:** Reserve a fixed decorative favicon slot
+  from first paint and keep the complete bookmark name authoritative. On phone,
+  icon and label share one native target at least 48px square; icon failure
+  returns silently to the same neutral fallback geometry.
+- **Computed adjacent context:** Place deterministic, qualitative context such
+  as moon phase inside the related existing story, with text carrying the
+  meaning. Do not create another source lifecycle, attribution, status, or
+  precision claim for locally derived context.
 - **Fresh state:** Small named state plus source time. A dot may reinforce it,
   but the word/time carries meaning.
+- **Saved-first refresh:** Hydrate a valid last-good reading before live work
+  settles, keep it fully legible, and place one fixed-height source-local line
+  beneath the heading for age plus `Refreshing`, `Up to date`, or `Refresh
+  failed`. Each source settles in place without blanking or moving siblings.
 - **Loading state:** Static tinted line placeholders and source-specific copy.
   No shimmer is required. Sources load independently.
 - **Stale state:** Keep last-good values visible and add an age, reason, and
@@ -162,10 +179,17 @@ Dawn.
   source error into a page-level failure.
 - **Status toast:** Fixed bottom-right on wide screens, bounded to the viewport,
   raised surface with a 3px gold left rule. It is an `aria-live` echo for
-  preference and refresh results, not the only carrier of essential status.
-- **Preference toolbar:** Compact square-cornered segmented groups, selected by
-  inset bottom rule. Sticky where space permits and static on phone so it does
-  not consume persistent vertical room.
+  preference, refresh, and confirmed-save results, not the only carrier of
+  essential status.
+- **Preference controls:** Dawn/Dense and System/Light/Dark use compact
+  square-cornered segmented groups selected by an inset bottom rule inside the
+  Settings work window; they apply immediately without joining the shared
+  bookmark draft.
+- **Settings work window:** Put infrequent device preferences and staged shared
+  editing in one visibly labeled, viewport-bounded modal while keeping their
+  persistence scopes explicit. The background stays inert and stationary;
+  header/footer actions remain reachable while only the body scrolls, and
+  mobile uses the full viewport with 44px controls.
 - **Focus:** 2px `--gold-bright` outline with 3px offset on every interactive
   element. Hover never substitutes for keyboard focus.
 - **Motion:** Segment and action feedback `160ms ease`; target and bookmark
@@ -175,7 +199,8 @@ Dawn.
   longer than 300ms, except non-animated state dwell timers.
 - **Responsive acceptance:** At 360, 680, 900, and 1440 CSS pixels verify no
   document overflow, the same values and states in both modes, 42–44px mobile
-  targets, wrapped long place names, and a bounded forecast scroller.
+  controls, 48px bookmark links, wrapped long place names, and a bounded
+  forecast scroller.
 - **Future widget placement:** Choose placement from information priority,
   freshness, and relationship to existing sources. Every new widget must define
   both a Dawn story treatment and Dense scan treatment before shipping. Do not

@@ -8,11 +8,12 @@ from.
 
 ## Shipped
 
-- **Count:** 1
-- **Last shipped:** homedash v1 — A private tailnet start page now combines
-  per-device Dawn and Dense views, location-aware weather, closest-first eBird
-  targets, ordered bookmarks, and llmdash coding headroom.
-- **Previously:** None.
+- **Count:** 6
+- **Last shipped:** Five-build Spool release — Added direct search and launch
+  actions, immediate cached readings, current moon phase, mobile bookmark
+  favicons and targets, and safe in-app bookmark management.
+- **Previously:** homedash v1 — The private tailnet start page established
+  Dawn and Dense views over weather, birding, coding runway, and bookmarks.
 
 ---
 
@@ -27,7 +28,5 @@ widget or management workflow.
 
 - Learn from daily use before adding more widgets or another presentation
   direction.
-- Revisit richer bookmark management if v1's chosen storage approach proves
-  too cumbersome.
 - Consider deeper history or alerts for eBird, weather, or coding headroom only
   after the glanceable core earns its place as the daily start page.
