@@ -8,12 +8,13 @@ from.
 
 ## Shipped
 
-- **Count:** 6
-- **Last shipped:** Five-build Spool release — Added direct search and launch
+- **Count:** 10
+- **Last shipped:** Four-build coastal and usability release — Added automatic
+  local tides, ten-mile eBird targets with nearest/recent ordering, clearer
+  mobile bookmarks, and a contained Kagi focus treatment.
+- **Previously:** Five-build Spool release — Added direct search and launch
   actions, immediate cached readings, current moon phase, mobile bookmark
   favicons and targets, and safe in-app bookmark management.
-- **Previously:** homedash v1 — The private tailnet start page established
-  Dawn and Dense views over weather, birding, coding runway, and bookmarks.
 
 ---
 

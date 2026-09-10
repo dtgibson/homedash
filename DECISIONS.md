@@ -41,3 +41,9 @@
 **Decision:** Codex prepares and verifies deployment scripts locally but does not access or change production machines; the user alone chooses the safe deployment window, runs the script on production, and reports its result.
 **Rationale:** Production access and timing belong to the operator, while local automation and verification remain useful preparation work.
 **Implications:** Future release work must stop at a ready, locally verified user-run script and treat the user's reported output as the deployment result.
+
+## Automatic local tide station selection — 2026-09-10
+
+**Decision:** When the private tide station setting is blank, Homedash chooses the nearest eligible active NOAA tidal water-level station on the server from the same current, recent last-known, then Home location used by weather; a valid private fixed station and label remain an override.
+**Rationale:** Tide should work on a newly installed device without duplicating location setup, while station selection and private location data stay inside Homedash and the operator can still choose a more hydrologically relevant station than the geometric nearest.
+**Implications:** NOAA receives no coordinates for station discovery, the browser receives a validated station name but no station ID or coordinates, and any future distance or regional eligibility rule must preserve the fixed override and isolated tide failure behavior.

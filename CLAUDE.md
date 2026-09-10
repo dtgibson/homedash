@@ -6,18 +6,20 @@
 - Give every dynamic widget an independent endpoint, runtime contract, freshness policy, loading and error state, retry path, and last-good snapshot.
 - Hydrate each valid browser-owned last-good snapshot before live work settles, keep its values visible while that source refreshes, and replace it only with that source's next validated response.
 - Feed Dawn and Dense from the same normalized dashboard state; a renderer may change layout but never values, freshness, availability, or ordering.
-- Treat upstream systems as authoritative: eBird through SnowRaven for birding history and media, llmdash for coding headroom, and the host bookmark file for link order.
+- Treat upstream systems as authoritative: eBird through SnowRaven for birding history and media, llmdash for coding headroom, NOAA for tide data, and the host bookmark file for link order.
+- Bound third-party bodies and record counts, validate every provider field before caching, reject control characters in strings that reach product copy, and enforce request deadlines through body streaming after headers.
 
 ## Browser State
 
-- Keep display mode and appearance together in the versioned per-browser preference record `homedash.preferences.v1`; do not sync these settings between devices.
-- Keep exact device coordinates out of responses, URLs, and logs; location falls back only from current to an eligible seven-day last-known value to the private Home setting.
+- Keep display mode, appearance, and eBird target order together in the versioned per-browser preference record `homedash.preferences.v1`; do not sync these settings between devices.
+- Keep exact device coordinates out of responses, URLs, and logs; weather, eBird, and automatic tide selection share the fallback from current to an eligible seven-day last-known value to the private Home setting.
 
 ## Domain Rules
 
-- For each eBird target category, deduplicate by canonical species, sort known numeric distances ascending, use recency only to break equal-distance ties, place unknown distances last, and apply the result limit after sorting.
+- For each eBird target category, derive deterministic nearest-first and most-recent-first projections from one normalized pool, deduplicate by canonical species under that projection's comparator, and apply the result limit only after ordering; switching the browser-owned order must not trigger another request.
 - Keep the private host bookmark document authoritative. Editor drafts are memory-only; publish ordered sections and bookmarks only after a complete, revision-checked, atomically verified save.
 - Treat bookmark favicons as bounded cosmetic enhancement: resolve only the current configured bookmark's conventional icon through the same-origin service and keep names, order, navigation, and freshness independent of icon success.
+- With a blank tide station setting, choose the nearest eligible active NOAA tidal water-level station on the server; a valid private fixed station overrides that choice, NOAA receives no selection coordinates, and browser responses expose the station name but never its ID or coordinates.
 
 ## Viewport Layout
 
