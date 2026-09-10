@@ -135,11 +135,14 @@ Dawn.
 - **Location provenance:** Place and source appear together: `Current device`,
   `Last known · <age>`, or `Home`. Exact coordinates never appear. A failed
   current request can retain last-known/home data with explicit provenance.
-- **Closest-first target list:** Deduplicate by canonical species before sort.
-  For Lifers, Photo, and Audio, put known numeric distance ascending; equal
-  distances use most recent observation first; unknown distances sort after all
-  known distances. Apply the category limit only after sorting. Show distance
-  in every row when available and print `closest first` beside target context.
+- **Selectable target order:** Deduplicate by canonical species before the
+  category limit and provide complete `Nearest` and `Recent` projections from
+  one normalized eBird reading. `Nearest` puts known numeric distance ascending,
+  then recency, with unknown distance last; `Recent` puts observation time
+  descending, then known distance. One per-browser choice spans Lifers, Photo,
+  Audio, Dawn, and Dense without triggering a source request. Keep its `Order`
+  group gold and separate from the green category tabs, and show both distance
+  and observation age in every row so the ordering remains legible.
 - **Target category tabs:** Lifers, Photo, and Audio use text tabs on a shared
   baseline. Selected state is green text plus a 2px underline and
   `aria-pressed=true`; no pill background.

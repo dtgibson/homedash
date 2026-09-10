@@ -64,7 +64,7 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
           data: {
             schemaVersion: 1 as const,
             data: {
-              radiusKm: 50,
+              radiusKm: 16,
               windowDays: 14,
               targets: {
                 lifer: [
@@ -78,6 +78,41 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
                 ],
                 photo: [],
                 audio: [],
+              },
+              targetOrders: {
+                distance: {
+                  lifer: [
+                    {
+                      speciesCode: 'ruff',
+                      commonName: 'Ruff',
+                      observedAt: now,
+                      locality: 'Bay shore',
+                      distanceKm: 2.4,
+                    },
+                  ],
+                  photo: [],
+                  audio: [],
+                },
+                recent: {
+                  lifer: [
+                    {
+                      speciesCode: 'towwar',
+                      commonName: "Townsend's Warbler",
+                      observedAt: '2026-09-08T05:30:00.000Z',
+                      locality: 'Oak grove',
+                      distanceKm: 7.1,
+                    },
+                    {
+                      speciesCode: 'ruff',
+                      commonName: 'Ruff',
+                      observedAt: now,
+                      locality: 'Bay shore',
+                      distanceKm: 2.4,
+                    },
+                  ],
+                  photo: [],
+                  audio: [],
+                },
               },
               targetAvailability: { lifer: true, photo: true, audio: true },
               month: {
@@ -393,7 +428,7 @@ describe('one store with two renderers', () => {
         '/launch/llmdash',
       )
       expect(screen.getByText('1.5 mi')).toBeVisible()
-      expect(screen.getByText(/within 31 mi · closest first/i)).toBeVisible()
+      expect(screen.getByText(/within 10 mi/i)).toBeVisible()
     }
 
     expectLaunches()
@@ -402,6 +437,59 @@ describe('one store with two renderers', () => {
     await closeSettings(user)
     expectLaunches()
     expect(screen.queryByText(/\bkm\b/i)).not.toBeInTheDocument()
+  })
+
+  it('switches one persisted target order across categories and renderers without a request', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const nearest = screen.getByRole('radio', { name: 'Nearest' })
+    const recent = screen.getByRole('radio', { name: 'Recent' })
+    expect(nearest).toBeChecked()
+    expect(screen.getByText('Ruff')).toBeVisible()
+    expect(screen.queryByText("Townsend's Warbler")).not.toBeInTheDocument()
+
+    await user.click(recent)
+
+    expect(recent).toBeChecked()
+    expect(recent).toHaveFocus()
+    expect(screen.getByText("Townsend's Warbler")).toBeVisible()
+    expect(screen.getByText('Recent targets selected.')).toBeVisible()
+    expect(JSON.parse(localStorage.getItem('homedash.preferences.v1') ?? '{}')).toMatchObject({
+      mode: 'dawn',
+      appearance: 'system',
+      targetSort: 'recent',
+    })
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('radio', { name: /Lifers/ }))
+    await openSettings(user)
+    await user.click(screen.getByRole('radio', { name: 'Dense' }))
+    await closeSettings(user)
+
+    expect(screen.getByRole('radio', { name: 'Recent' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Lifers/ })).toBeChecked()
+    expect(screen.getByText("Townsend's Warbler")).toBeVisible()
+  })
+
+  it('keeps a target order active and announces when storage refuses it', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = () => {
+      throw new DOMException('Storage disabled', 'SecurityError')
+    }
+    try {
+      await user.click(screen.getByRole('radio', { name: 'Recent' }))
+    } finally {
+      Storage.prototype.setItem = original
+    }
+
+    expect(screen.getByRole('radio', { name: 'Recent' })).toBeChecked()
+    expect(screen.getByText("Townsend's Warbler")).toBeVisible()
+    expect(
+      screen.getByText('Recent targets selected. This browser could not retain the choice.'),
+    ).toBeVisible()
   })
 
   it('shows the same source freshness and aggregate progress in Dawn and Dense', async () => {

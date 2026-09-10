@@ -1,5 +1,5 @@
 import * as ToggleGroup from '@radix-ui/react-toggle-group'
-import type { EbirdSummary, EbirdTarget } from '../shared/contracts'
+import type { EbirdSummary, EbirdTarget, TargetSort } from '../shared/contracts'
 import { formatDistance, formatObserved } from '../lib/format'
 
 export type TargetCategory = keyof EbirdSummary['targets']
@@ -7,11 +7,13 @@ export type TargetCategory = keyof EbirdSummary['targets']
 export function TargetTabs({
   category,
   summary,
+  targetSort,
   dense = false,
   onCategory,
 }: {
   category: TargetCategory
   summary: EbirdSummary
+  targetSort: TargetSort
   dense?: boolean
   onCategory: (category: TargetCategory) => void
 }) {
@@ -28,10 +30,38 @@ export function TargetTabs({
       {(['lifer', 'photo', 'audio'] as const).map((name) => (
         <ToggleGroup.Item key={name} value={name} disabled={!summary.targetAvailability[name]}>
           {name === 'lifer' ? 'Lifers' : name[0].toUpperCase() + name.slice(1)} ·{' '}
-          {summary.targetAvailability[name] ? summary.targets[name].length : '—'}
+          {summary.targetAvailability[name] ? summary.targetOrders[targetSort][name].length : '—'}
         </ToggleGroup.Item>
       ))}
     </ToggleGroup.Root>
+  )
+}
+
+export function TargetOrder({
+  value,
+  dense = false,
+  onValueChange,
+}: {
+  value: TargetSort
+  dense?: boolean
+  onValueChange: (value: TargetSort) => void
+}) {
+  return (
+    <div className={dense ? 'target-order dense-target-order' : 'target-order'}>
+      <span className="target-order-label">Order</span>
+      <ToggleGroup.Root
+        className="target-order-options"
+        type="single"
+        value={value}
+        aria-label="eBird target order"
+        onValueChange={(next) => {
+          if (next === 'distance' || next === 'recent') onValueChange(next)
+        }}
+      >
+        <ToggleGroup.Item value="distance">Nearest</ToggleGroup.Item>
+        <ToggleGroup.Item value="recent">Recent</ToggleGroup.Item>
+      </ToggleGroup.Root>
+    </div>
   )
 }
 

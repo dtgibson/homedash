@@ -25,6 +25,16 @@ describe('bookmark document origin configuration', () => {
   })
 })
 
+describe('eBird radius configuration', () => {
+  it('defaults standard installations to the ten-mile-equivalent radius', () => {
+    expect(loadConfig({}).ebirdRadiusKm).toBe(16)
+  })
+
+  it('keeps a valid custom host radius authoritative', () => {
+    expect(loadConfig({ EBIRD_RADIUS_KM: '23' }).ebirdRadiusKm).toBe(23)
+  })
+})
+
 describe('private tide station configuration', () => {
   it('keeps a missing station nonfatal and defaults a configured station label', () => {
     expect(loadConfig({}).tide).toEqual({ status: 'unavailable', reason: 'missing-station' })

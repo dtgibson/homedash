@@ -81,6 +81,80 @@ describe('closest-first eBird targets', () => {
   })
 })
 
+describe('selectable eBird target ordering', () => {
+  const profile = {
+    seen: new Set<string>(),
+    photo: new Set<string>(),
+    audio: new Set<string>(),
+    mediaAvailable: true,
+  }
+
+  it('keeps the newest species report for Recent even when its nearer report is older', () => {
+    const observations = [
+      target('duplicate', 1, '2026-09-01T10:00:00.000Z', 'Duplicate old'),
+      target('duplicate', 8, '2026-09-09T10:00:00.000Z', 'Duplicate new'),
+      target('nearer-tie', 2, '2026-09-08T10:00:00.000Z'),
+      target('farther-tie', 7, '2026-09-08T10:00:00.000Z'),
+      target('unknown-tie', null, '2026-09-08T10:00:00.000Z'),
+    ]
+
+    const recent = dedupeSortTargets(observations, 'recent')
+    expect(recent.map((item) => item.speciesCode)).toEqual([
+      'duplicate',
+      'nearer-tie',
+      'farther-tie',
+      'unknown-tie',
+    ])
+    expect(recent[0]).toMatchObject({ commonName: 'Duplicate new', distanceKm: 8 })
+  })
+
+  it('selects Recent from the complete category pool instead of reordering the five nearest', () => {
+    const observations = [
+      target('near-1', 1, '2026-09-01T10:00:00.000Z'),
+      target('near-2', 2, '2026-09-02T10:00:00.000Z'),
+      target('near-3', 3, '2026-09-03T10:00:00.000Z'),
+      target('near-4', 4, '2026-09-04T10:00:00.000Z'),
+      target('near-5', 5, '2026-09-05T10:00:00.000Z'),
+      target('far-new', 15, '2026-09-10T10:00:00.000Z'),
+    ]
+
+    expect(
+      classifyTargetCategories(observations, profile, 5, 'distance').lifer.map(
+        (item) => item.speciesCode,
+      ),
+    ).not.toContain('far-new')
+    expect(
+      classifyTargetCategories(observations, profile, 5, 'recent').lifer.map(
+        (item) => item.speciesCode,
+      ),
+    ).toEqual(['far-new', 'near-5', 'near-4', 'near-3', 'near-2'])
+  })
+
+  it.each(['distance', 'recent'] as const)(
+    'uses stable lexical fields for exact %s ties regardless of provider order',
+    (order) => {
+      const observations = [
+        {
+          ...target('same', 4, '2026-09-08T10:00:00.000Z', 'Zulu name'),
+          locality: 'Zulu marsh',
+        },
+        {
+          ...target('same', 4, '2026-09-08T10:00:00.000Z', 'Alpha name'),
+          locality: 'Alpha marsh',
+        },
+        target('z-species', 4, '2026-09-08T10:00:00.000Z'),
+        target('a-species', 4, '2026-09-08T10:00:00.000Z'),
+      ]
+
+      const forward = dedupeSortTargets(observations, order)
+      const reversed = dedupeSortTargets([...observations].reverse(), order)
+      expect(forward).toEqual(reversed)
+      expect(forward.map((item) => item.speciesCode)).toEqual(['a-species', 'same', 'z-species'])
+      expect(forward.find((item) => item.speciesCode === 'same')?.locality).toBe('Alpha marsh')
+    },
+  )
+})
+
 describe('month-to-date comparison', () => {
   it('counts distinct canonical species over equivalent partial periods', () => {
     const observations = [

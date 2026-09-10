@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDistance, formatMiles, kilometersToMiles } from './format'
+import { formatDistance, formatMiles, formatRadiusMiles, kilometersToMiles } from './format'
 
 describe('eBird mile presentation', () => {
   it('uses the approved statute-mile conversion without changing source kilometers', () => {
@@ -19,5 +19,9 @@ describe('eBird mile presentation', () => {
 
   it('keeps an unknown target distance explicit', () => {
     expect(formatDistance(null)).toBe('distance unknown')
+  })
+
+  it('presents the configured search area as a whole-mile radius', () => {
+    expect(formatRadiusMiles(16)).toBe('10 mi')
   })
 })

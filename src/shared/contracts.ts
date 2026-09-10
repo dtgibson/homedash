@@ -169,14 +169,24 @@ export const ebirdTargetSchema = z.object({
   distanceKm: z.number().nonnegative().nullable(),
 })
 
+export const ebirdTargetSetSchema = z
+  .object({
+    lifer: z.array(ebirdTargetSchema).max(5),
+    photo: z.array(ebirdTargetSchema).max(5),
+    audio: z.array(ebirdTargetSchema).max(5),
+  })
+  .strict()
+
 export const ebirdSummarySchema = z.object({
   radiusKm: z.number().positive(),
   windowDays: z.number().int().positive(),
-  targets: z.object({
-    lifer: z.array(ebirdTargetSchema),
-    photo: z.array(ebirdTargetSchema),
-    audio: z.array(ebirdTargetSchema),
-  }),
+  targets: ebirdTargetSetSchema,
+  targetOrders: z
+    .object({
+      distance: ebirdTargetSetSchema,
+      recent: ebirdTargetSetSchema,
+    })
+    .strict(),
   targetAvailability: z.object({
     lifer: z.boolean(),
     photo: z.boolean(),
@@ -362,10 +372,13 @@ export type BookmarkDocumentErrorResponse = z.infer<typeof bookmarkDocumentError
 export type ReplaceBookmarkDocumentRequest = z.infer<typeof replaceBookmarkDocumentRequestSchema>
 export type { BookmarkDocumentFieldError, BookmarkDocumentV1 }
 
+export const targetSortSchema = z.enum(['distance', 'recent'])
+
 export const preferencesSchema = z.object({
   schemaVersion: z.literal(1),
   mode: z.enum(['dawn', 'dense']),
   appearance: z.enum(['system', 'light', 'dark']),
+  targetSort: targetSortSchema.catch('distance').default('distance'),
 })
 
 export const storedLocationSchema = z.object({
@@ -376,10 +389,12 @@ export const storedLocationSchema = z.object({
 })
 
 export type DevicePreferences = z.infer<typeof preferencesSchema>
+export type TargetSort = z.infer<typeof targetSortSchema>
 export type StoredLocation = z.infer<typeof storedLocationSchema>
 
 export const DEFAULT_PREFERENCES: DevicePreferences = {
   schemaVersion: 1,
   mode: 'dawn',
   appearance: 'system',
+  targetSort: 'distance',
 }

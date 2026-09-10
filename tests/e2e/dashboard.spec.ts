@@ -236,48 +236,132 @@ test.beforeEach(async ({ context, page }) => {
       body = {
         schemaVersion: 1,
         data: {
-          radiusKm: 50,
+          radiusKm: 16,
           windowDays: 14,
           targets: {
             lifer: [
               {
                 speciesCode: 'amered',
                 commonName: 'American Redstart',
-                observedAt: now,
+                observedAt: '2026-09-10T05:00:00.000Z',
                 locality: 'Nearby park',
                 distanceKm: 2.1,
               },
               {
                 speciesCode: 'bkbwar',
                 commonName: 'Blackburnian Warbler',
-                observedAt: now,
+                observedAt: '2026-09-10T06:00:00.000Z',
                 locality: 'Golden Gate Park · Lily Pond',
                 distanceKm: 4.7,
               },
               {
                 speciesCode: 'calthr',
                 commonName: 'California Thrasher',
-                observedAt: now,
+                observedAt: '2026-09-10T07:00:00.000Z',
                 locality: 'Fort Funston',
                 distanceKm: 11,
               },
               {
                 speciesCode: 'baisan',
                 commonName: 'Baird’s Sandpiper',
-                observedAt: now,
+                observedAt: '2026-09-10T08:00:00.000Z',
                 locality: 'Hayward Regional Shoreline',
                 distanceKm: 27,
               },
               {
                 speciesCode: 'ruff',
                 commonName: 'Ruff',
-                observedAt: now,
+                observedAt: '2026-09-10T09:00:00.000Z',
                 locality: 'Don Edwards NWR · Alviso',
                 distanceKm: 49,
               },
             ],
             photo: [],
             audio: [],
+          },
+          targetOrders: {
+            distance: {
+              lifer: [
+                {
+                  speciesCode: 'amered',
+                  commonName: 'American Redstart',
+                  observedAt: '2026-09-10T05:00:00.000Z',
+                  locality: 'Nearby park',
+                  distanceKm: 2.1,
+                },
+                {
+                  speciesCode: 'bkbwar',
+                  commonName: 'Blackburnian Warbler',
+                  observedAt: '2026-09-10T06:00:00.000Z',
+                  locality: 'Golden Gate Park · Lily Pond',
+                  distanceKm: 4.7,
+                },
+                {
+                  speciesCode: 'calthr',
+                  commonName: 'California Thrasher',
+                  observedAt: '2026-09-10T07:00:00.000Z',
+                  locality: 'Fort Funston',
+                  distanceKm: 11,
+                },
+                {
+                  speciesCode: 'baisan',
+                  commonName: 'Baird’s Sandpiper',
+                  observedAt: '2026-09-10T08:00:00.000Z',
+                  locality: 'Hayward Regional Shoreline',
+                  distanceKm: 27,
+                },
+                {
+                  speciesCode: 'ruff',
+                  commonName: 'Ruff',
+                  observedAt: '2026-09-10T09:00:00.000Z',
+                  locality: 'Don Edwards NWR · Alviso',
+                  distanceKm: 49,
+                },
+              ],
+              photo: [],
+              audio: [],
+            },
+            recent: {
+              lifer: [
+                {
+                  speciesCode: 'ruff',
+                  commonName: 'Ruff',
+                  observedAt: '2026-09-10T09:00:00.000Z',
+                  locality: 'Don Edwards NWR · Alviso',
+                  distanceKm: 49,
+                },
+                {
+                  speciesCode: 'baisan',
+                  commonName: 'Baird’s Sandpiper',
+                  observedAt: '2026-09-10T08:00:00.000Z',
+                  locality: 'Hayward Regional Shoreline',
+                  distanceKm: 27,
+                },
+                {
+                  speciesCode: 'calthr',
+                  commonName: 'California Thrasher',
+                  observedAt: '2026-09-10T07:00:00.000Z',
+                  locality: 'Fort Funston',
+                  distanceKm: 11,
+                },
+                {
+                  speciesCode: 'bkbwar',
+                  commonName: 'Blackburnian Warbler',
+                  observedAt: '2026-09-10T06:00:00.000Z',
+                  locality: 'Golden Gate Park · Lily Pond',
+                  distanceKm: 4.7,
+                },
+                {
+                  speciesCode: 'amered',
+                  commonName: 'American Redstart',
+                  observedAt: '2026-09-10T05:00:00.000Z',
+                  locality: 'Nearby park',
+                  distanceKm: 2.1,
+                },
+              ],
+              photo: [],
+              audio: [],
+            },
           },
           targetAvailability: { lifer: true, photo: true, audio: true },
           month: {
@@ -411,11 +495,23 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
     'href',
     '/launch/llmdash',
   )
-  await expect(page.getByText('within 31 mi · closest first')).toBeVisible()
+  await expect(page.getByText('within 10 mi')).toBeVisible()
   await expect(page.getByText('1.3 mi')).toBeVisible()
   for (const name of [...targetNames, ...bookmarkNames]) {
     await expect(page.locator('main')).toContainText(name)
   }
+
+  let sortEbirdRequests = 0
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/ebird/summary') sortEbirdRequests += 1
+  })
+  await expect(page.getByRole('radio', { name: 'Nearest' })).toBeChecked()
+  const recentOrder = page.getByRole('radio', { name: 'Recent' })
+  await recentOrder.click()
+  await expect(recentOrder).toBeChecked()
+  await expect(recentOrder).toBeFocused()
+  await expect(page.locator('.target-list .target-item strong').first()).toHaveText('Ruff')
+  expect(sortEbirdRequests).toBe(0)
 
   const mastheadIsContained = await page.evaluate(() => {
     const lede = document.querySelector('.lede')?.getBoundingClientRect()
@@ -476,6 +572,7 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   await settings.getByRole('radio', { name: 'Dense', exact: true }).click()
   await closeSettings(page)
   await expect(page.getByRole('heading', { name: 'Weather' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'Recent' })).toBeChecked()
   await expect(page.locator('.dense-tide-line')).toHaveAccessibleName(
     /Tide 2\.1 ft observed, rising\. Next high 5\.4 ft/i,
   )
@@ -502,6 +599,7 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   await closeSettings(page)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Weather' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'Recent' })).toBeChecked()
   await expect(kagiQuery).toBeFocused()
   const persistedKagiFocusTreatment = await kagiQuery.evaluate((input) => {
     const style = getComputedStyle(input)
@@ -991,6 +1089,8 @@ test('named mobile controls and bookmarks keep their touch baselines', async ({
   }
 
   await selectMode(page, 'Dense')
+  await expectTouchTarget('Nearest', page.getByRole('radio', { name: 'Nearest' }))
+  await expectTouchTarget('Recent', page.getByRole('radio', { name: 'Recent' }))
   for (const name of [/Lifers/, /Photo/, /Audio/]) {
     await expectTouchTarget(String(name), page.getByRole('radio', { name }))
   }

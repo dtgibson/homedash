@@ -159,7 +159,7 @@ HOME_LONGITUDE=
 HOME_LABEL=Home
 
 WEATHER_UNIT=fahrenheit
-EBIRD_RADIUS_KM=50
+EBIRD_RADIUS_KM=16
 EBIRD_WINDOW_DAYS=14
 EBIRD_TARGET_LIMIT=5
 BOOKMARKS_PATH=$BOOKMARK_STATE_DIR/bookmarks.json
@@ -167,6 +167,11 @@ EOF
   printf 'Created private configuration at %s/.env.\n' "$APP_DIR"
 else
   printf 'Preserving existing private configuration at %s/.env.\n' "$APP_DIR"
+  RADIUS_MIGRATION="$($NODE_BIN scripts/migrate-managed-env.mjs .env)" ||
+    fail "the managed eBird radius could not be checked."
+  if [[ "$RADIUS_MIGRATION" == "updated" ]]; then
+    printf 'Updated the managed eBird radius to the ten-mile standard.\n'
+  fi
   if ! grep -Eq '^[[:space:]]*HOMEDASH_ALLOWED_ORIGINS=' .env; then
     printf '\nHOMEDASH_ALLOWED_ORIGINS=%s\n' "$DEFAULT_ALLOWED_ORIGINS" >>.env
     printf 'Added exact loopback and installed Tailscale origins to private configuration.\n'

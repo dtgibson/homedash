@@ -1,10 +1,11 @@
 import type { DashboardData, WidgetName } from '../hooks/useDashboardData'
-import { formatAge, formatMiles, signed } from '../lib/format'
+import { formatAge, formatRadiusMiles, signed } from '../lib/format'
 import type { MoonPhaseLabel } from '../lib/moonPhase'
+import type { TargetSort } from '../shared/contracts'
 import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DawnProvider } from './Quota'
-import { TargetList, TargetTabs } from './Targets'
+import { TargetList, TargetOrder, TargetTabs } from './Targets'
 import { CoastalDay, DawnTideDetails } from './Tide'
 import { DawnWeather, LocationProvenance } from './Weather'
 import { ErrorState, LoadingState, SourceFreshness, StateBadge } from './WidgetState'
@@ -27,11 +28,21 @@ interface ViewProps {
   data: DashboardData
   moonPhase: MoonPhaseLabel | null
   category: TargetCategory
+  targetSort: TargetSort
   onCategory: (category: TargetCategory) => void
+  onTargetSort: (targetSort: TargetSort) => void
   onRetry: (source: WidgetName) => void
 }
 
-export function DawnView({ data, moonPhase, category, onCategory, onRetry }: ViewProps) {
+export function DawnView({
+  data,
+  moonPhase,
+  category,
+  targetSort,
+  onCategory,
+  onTargetSort,
+  onRetry,
+}: ViewProps) {
   const weather = data.weather.status === 'ready' ? data.weather.data : null
   const ebird = data.ebird.status === 'ready' ? data.ebird.data : null
   const llmdash = data.llmdash.status === 'ready' ? data.llmdash.data : null
@@ -39,7 +50,7 @@ export function DawnView({ data, moonPhase, category, onCategory, onRetry }: Vie
   const tide = data.tide.status === 'ready' ? data.tide.data : null
 
   const lede = weather
-    ? `${weather.data.condition} with a high of ${Math.round(weather.data.high)}°. ${tide ? `The water is ${tide.data.current.direction.replace('-', ' ')} toward a ${tide.data.nextTurn.kind}.` : ebird ? `${ebird.data.targets[category].length} ${category} targets are nearby.` : 'Birding data is still arriving.'}`
+    ? `${weather.data.condition} with a high of ${Math.round(weather.data.high)}°. ${tide ? `The water is ${tide.data.current.direction.replace('-', ' ')} toward a ${tide.data.nextTurn.kind}.` : ebird ? `${ebird.data.targetOrders[targetSort][category].length} ${category} targets are nearby.` : 'Birding data is still arriving.'}`
     : 'Your weather, birding opportunities, coding runway, and destinations in one place.'
 
   return (
@@ -154,11 +165,19 @@ export function DawnView({ data, moonPhase, category, onCategory, onRetry }: Vie
                   <span className="month-action">My eBird ↗</span>
                 </div>
               </a>
-              <p className="section-kicker">
-                Top nearby targets · within {formatMiles(ebird.data.radiusKm)} · closest first
-              </p>
-              <TargetTabs category={category} summary={ebird.data} onCategory={onCategory} />
-              <TargetList targets={ebird.data.targets[category]} />
+              <div className="target-context">
+                <p className="section-kicker">
+                  Top nearby targets · within {formatRadiusMiles(ebird.data.radiusKm)}
+                </p>
+                <TargetOrder value={targetSort} onValueChange={onTargetSort} />
+              </div>
+              <TargetTabs
+                category={category}
+                summary={ebird.data}
+                targetSort={targetSort}
+                onCategory={onCategory}
+              />
+              <TargetList targets={ebird.data.targetOrders[targetSort][category]} />
             </>
           )}
         </article>

@@ -95,7 +95,7 @@ const envSchema = z
     HOME_LONGITUDE: optionalCoordinate,
     HOME_LABEL: z.string().min(1).max(100).default('Home'),
     WEATHER_UNIT: z.enum(['fahrenheit', 'celsius']).default('fahrenheit'),
-    EBIRD_RADIUS_KM: z.coerce.number().int().min(1).max(200).default(50),
+    EBIRD_RADIUS_KM: z.coerce.number().int().min(1).max(200).default(16),
     EBIRD_WINDOW_DAYS: z.coerce.number().int().min(1).max(30).default(14),
     EBIRD_TARGET_LIMIT: z.coerce.number().int().min(1).max(20).default(5),
     BOOKMARKS_PATH: z.string().default('./config/bookmarks.json'),

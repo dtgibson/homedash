@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -35,6 +35,14 @@ function validate(bookmarksFile: string) {
       stateRoot,
       bookmarksFile,
     ],
+    { encoding: 'utf8' },
+  )
+}
+
+function migrateManagedEnv(envPath: string) {
+  return spawnSync(
+    process.execPath,
+    [path.join(process.cwd(), 'scripts', 'migrate-managed-env.mjs'), envPath],
     { encoding: 'utf8' },
   )
 }
@@ -107,5 +115,41 @@ describe('installer private tide configuration', () => {
     expect(installer).toContain("grep -Eq '^[[:space:]]*TIDE_STATION_LABEL=' .env")
     expect(bootstrap).toContain('TIDE_STATION_ID="${TIDE_STATION_ID:-}"')
     expect(bootstrap).toContain('TIDE_STATION_LABEL="${TIDE_STATION_LABEL:-Local tide}"')
+  })
+})
+
+describe('installer managed eBird radius migration', () => {
+  it('updates only the exact prior default while preserving bytes and file mode', async () => {
+    const envPath = path.join(root, '.env')
+    await writeFile(envPath, 'FIRST=value\r\nEBIRD_RADIUS_KM=50\r\nLAST=kept\r\n')
+    await chmod(envPath, 0o640)
+
+    const result = migrateManagedEnv(envPath)
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toBe('updated')
+    expect(await readFile(envPath, 'utf8')).toBe(
+      'FIRST=value\r\nEBIRD_RADIUS_KM=16\r\nLAST=kept\r\n',
+    )
+    expect((await stat(envPath)).mode & 0o777).toBe(0o640)
+  })
+
+  it.each([
+    ['custom value', 'EBIRD_RADIUS_KM=23\n'],
+    ['leading whitespace', ' EBIRD_RADIUS_KM=50\n'],
+    ['assignment whitespace', 'EBIRD_RADIUS_KM =50\n'],
+    ['inline comment', 'EBIRD_RADIUS_KM=50 # managed?\n'],
+    ['duplicate exact keys', 'EBIRD_RADIUS_KM=50\nEBIRD_RADIUS_KM=50\n'],
+    ['mixed duplicate keys', 'EBIRD_RADIUS_KM=50\n EBIRD_RADIUS_KM=23\n'],
+    ['missing key', 'OTHER=value\n'],
+  ])('preserves a %s environment file byte for byte', async (_case, source) => {
+    const envPath = path.join(root, '.env')
+    await writeFile(envPath, source)
+
+    const result = migrateManagedEnv(envPath)
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toBe('preserved')
+    expect(await readFile(envPath, 'utf8')).toBe(source)
   })
 })

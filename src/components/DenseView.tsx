@@ -1,10 +1,11 @@
 import type { DashboardData, WidgetName } from '../hooks/useDashboardData'
-import { formatAge, formatMiles, signed } from '../lib/format'
+import { formatAge, formatRadiusMiles, signed } from '../lib/format'
 import type { MoonPhaseLabel } from '../lib/moonPhase'
+import type { TargetSort } from '../shared/contracts'
 import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DenseProvider } from './Quota'
-import { TargetList, TargetTabs } from './Targets'
+import { TargetList, TargetOrder, TargetTabs } from './Targets'
 import { DenseTide } from './Tide'
 import { DenseDaylight, DenseWeather } from './Weather'
 import { ErrorState, LoadingState, SourceFreshness } from './WidgetState'
@@ -13,11 +14,21 @@ interface DenseViewProps {
   data: DashboardData
   moonPhase: MoonPhaseLabel | null
   category: TargetCategory
+  targetSort: TargetSort
   onCategory: (category: TargetCategory) => void
+  onTargetSort: (targetSort: TargetSort) => void
   onRetry: (source: WidgetName) => void
 }
 
-export function DenseView({ data, moonPhase, category, onCategory, onRetry }: DenseViewProps) {
+export function DenseView({
+  data,
+  moonPhase,
+  category,
+  targetSort,
+  onCategory,
+  onTargetSort,
+  onRetry,
+}: DenseViewProps) {
   const weather = data.weather.status === 'ready' ? data.weather.data : null
   const ebird = data.ebird.status === 'ready' ? data.ebird.data : null
   const llmdash = data.llmdash.status === 'ready' ? data.llmdash.data : null
@@ -121,19 +132,23 @@ export function DenseView({ data, moonPhase, category, onCategory, onRetry }: De
                   </span>
                   <span className="dense-faint">vs {ebird.data.month.previousCount} last year</span>
                   <span className="dense-faint">
-                    within {formatMiles(ebird.data.radiusKm)} · closest first
-                  </span>
-                  <span className="dense-faint">
                     profile {formatAge(ebird.data.profileUpdatedAt)}
                   </span>
+                </div>
+                <div className="target-context dense-target-context">
+                  <span className="dense-faint">
+                    within {formatRadiusMiles(ebird.data.radiusKm)}
+                  </span>
+                  <TargetOrder dense value={targetSort} onValueChange={onTargetSort} />
                 </div>
                 <TargetTabs
                   dense
                   category={category}
                   summary={ebird.data}
+                  targetSort={targetSort}
                   onCategory={onCategory}
                 />
-                <TargetList dense targets={ebird.data.targets[category]} />
+                <TargetList dense targets={ebird.data.targetOrders[targetSort][category]} />
               </>
             )}
           </div>

@@ -66,9 +66,13 @@ function envelopes({
     ebird: {
       schemaVersion: 1 as const,
       data: {
-        radiusKm: 50,
+        radiusKm: 16,
         windowDays: 14,
         targets: { lifer: [], photo: [], audio: [] },
+        targetOrders: {
+          distance: { lifer: [], photo: [], audio: [] },
+          recent: { lifer: [], photo: [], audio: [] },
+        },
         targetAvailability: { lifer: true, photo: true, audio: true },
         month: {
           label: 'September',
@@ -345,6 +349,21 @@ describe('cached dashboard refresh lifecycle', () => {
     })
     expect(result.current.data.llmdash.status).toBe('loading')
     expect(result.current.data.tide.status).toBe('loading')
+  })
+
+  it('ignores a legacy eBird snapshot that cannot provide both complete orders', () => {
+    const saved = envelopes().ebird
+    const legacyData: Record<string, unknown> = { ...saved.data }
+    delete legacyData.targetOrders
+    localStorage.setItem('homedash.cache.ebird.v1', JSON.stringify({ ...saved, data: legacyData }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    )
+
+    const { result } = renderHook(() => useDashboardData())
+
+    expect(result.current.data.ebird.status).toBe('loading')
   })
 
   it('keeps every last-good value visible during a manual refresh batch', async () => {

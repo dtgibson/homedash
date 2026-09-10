@@ -5,14 +5,36 @@ beforeEach(() => localStorage.clear())
 
 describe('browser-owned preferences and location', () => {
   it('falls back to Dawn and System for missing or malformed preferences', () => {
-    expect(readPreferences()).toMatchObject({ mode: 'dawn', appearance: 'system' })
+    expect(readPreferences()).toMatchObject({
+      mode: 'dawn',
+      appearance: 'system',
+      targetSort: 'distance',
+    })
     localStorage.setItem('homedash.preferences.v1', '{broken')
-    expect(readPreferences()).toMatchObject({ mode: 'dawn', appearance: 'system' })
+    expect(readPreferences()).toMatchObject({
+      mode: 'dawn',
+      appearance: 'system',
+      targetSort: 'distance',
+    })
     localStorage.setItem(
       'homedash.preferences.v1',
       JSON.stringify({ schemaVersion: 1, mode: 'quiet', appearance: 'purple' }),
     )
-    expect(readPreferences()).toMatchObject({ mode: 'dawn', appearance: 'system' })
+    expect(readPreferences()).toMatchObject({
+      mode: 'dawn',
+      appearance: 'system',
+      targetSort: 'distance',
+    })
+    localStorage.setItem(
+      'homedash.preferences.v1',
+      JSON.stringify({ schemaVersion: 1, mode: 'dense', appearance: 'dark', targetSort: 'newest' }),
+    )
+    expect(readPreferences()).toEqual({
+      schemaVersion: 1,
+      mode: 'dense',
+      appearance: 'dark',
+      targetSort: 'distance',
+    })
   })
 
   it('only offers a last-known location captured within seven days', () => {
@@ -34,6 +56,7 @@ describe('browser-owned preferences and location', () => {
       schemaVersion: 1 as const,
       mode: 'dense' as const,
       appearance: 'dark' as const,
+      targetSort: 'recent' as const,
     }
     expect(savePreferences(preference)).toBe(true)
     expect(readPreferences()).toEqual(preference)
