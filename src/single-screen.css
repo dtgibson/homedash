@@ -87,8 +87,10 @@ body {
   color: var(--ink);
   outline: 0;
   background: transparent;
+  box-shadow: inset 0 0 0 transparent;
   font-family: var(--body);
   font-size: 11px;
+  transition: box-shadow 160ms ease;
 }
 
 .kagi-form input::placeholder {
@@ -97,8 +99,8 @@ body {
 }
 
 .kagi-form input:focus-visible {
-  outline: 2px solid var(--gold-bright);
-  outline-offset: 3px;
+  outline: 0;
+  box-shadow: inset 0 -2px 0 var(--gold-bright);
 }
 
 .kagi-form button {

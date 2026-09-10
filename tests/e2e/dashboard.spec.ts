@@ -345,7 +345,14 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   await expect(page.getByRole('heading', { name: 'Birding pulse' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Coding runway' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Places to go' })).toBeVisible()
-  await expect(page.getByRole('searchbox', { name: 'Kagi' })).toBeFocused()
+  const kagiQuery = page.getByRole('searchbox', { name: 'Kagi' })
+  await expect(kagiQuery).toBeFocused()
+  const kagiFocusTreatment = await kagiQuery.evaluate((input) => {
+    const style = getComputedStyle(input)
+    return { outlineStyle: style.outlineStyle, boxShadow: style.boxShadow }
+  })
+  expect(kagiFocusTreatment.outlineStyle).toBe('none')
+  expect(kagiFocusTreatment.boxShadow).toContain('inset')
   await expect(page.getByRole('search', { name: 'Kagi web search' })).toHaveAttribute(
     'action',
     'https://kagi.com/search',
@@ -447,6 +454,13 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   await closeSettings(page)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Weather' })).toBeVisible()
+  await expect(kagiQuery).toBeFocused()
+  const persistedKagiFocusTreatment = await kagiQuery.evaluate((input) => {
+    const style = getComputedStyle(input)
+    return { outlineStyle: style.outlineStyle, boxShadow: style.boxShadow }
+  })
+  expect(persistedKagiFocusTreatment.outlineStyle).toBe('none')
+  expect(persistedKagiFocusTreatment.boxShadow).toContain('inset')
   const persistedSettings = await openSettings(page)
   await expect(persistedSettings.getByRole('radio', { name: 'Dense', exact: true })).toBeChecked()
   await closeSettings(page)
