@@ -41,8 +41,9 @@ A 120×18 inline SVG sits at the end of the line when space permits. It draws th
 
 ## Interaction Notes
 - The graphic is read-only. Hover may expose the nearest predicted time/height for pointer users, but all required facts remain persistently visible and no hover interaction is required to understand the tide.
+- Initial load and location refresh use the same current, recent last-known, or Home selection for weather, eBird, and automatic tide-station choice; this changes data, not layout.
 - Global refresh includes tide and advances the existing progress indicator to five total sources.
-- A tide error's retry requests only tide. It does not restart weather, daylight, moon, or other widgets.
+- A tide error's retry requests only tide with the active location. It does not restart weather, daylight, moon, or other widgets.
 - Dawn and Dense receive the same normalized points, current value, direction, and next turn; only composition changes.
 - Time and height scales clamp validated values inside the SVG. A constant range receives symmetric padding so the line remains visible.
 
@@ -57,7 +58,7 @@ A 120×18 inline SVG sits at the end of the line when space permits. It draws th
 - Use `observed` and `predicted` exactly; never call a predicted interpolation a reading.
 - Direction is `rising`, `falling`, or `near slack`; arrows may reinforce rising/falling but never replace the words.
 - Identify the next event as `High` or `Low`, followed by height and time.
-- Show the configured station label and `MLLW` datum for provenance, never the station ID or coordinates.
+- Show the automatically selected NOAA station's public name, or the private override label when configured, with `MLLW` for provenance; never show the station ID or coordinates.
 - Keep moon language independent: `Moon · Waxing gibbous`, not `tide driven by…` or any precision claim.
 
 ## Responsive Acceptance

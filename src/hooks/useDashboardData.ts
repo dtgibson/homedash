@@ -274,7 +274,7 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
   )
 
   const loadLocationWidget = useCallback(
-    async (name: 'weather' | 'ebird', location: LocationSelector, force: boolean) => {
+    async (name: 'weather' | 'ebird' | 'tide', location: LocationSelector, force: boolean) => {
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
       if (name === 'weather') {
         await load(
@@ -286,10 +286,20 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
         )
         return
       }
+      if (name === 'ebird') {
+        await load(
+          'ebird',
+          '/api/ebird/summary',
+          ebirdEnvelopeSchema,
+          { method: 'POST', body: JSON.stringify({ location, timeZone }) },
+          force,
+        )
+        return
+      }
       await load(
-        'ebird',
-        '/api/ebird/summary',
-        ebirdEnvelopeSchema,
+        'tide',
+        '/api/tide',
+        tideEnvelopeSchema,
         { method: 'POST', body: JSON.stringify({ location, timeZone }) },
         force,
       )
@@ -302,31 +312,19 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
       await Promise.allSettled([
         loadLocationWidget('weather', location, force),
         loadLocationWidget('ebird', location, force),
+        loadLocationWidget('tide', location, force),
       ])
     },
     [loadLocationWidget],
   )
 
-  const loadTide = useCallback(
-    async (force: boolean) => {
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-      await load(
-        'tide',
-        '/api/tide',
-        tideEnvelopeSchema,
-        { method: 'POST', body: JSON.stringify({ timeZone }) },
-        force,
-      )
-    },
-    [load],
-  )
-
   const chooseLocation = useCallback(async () => {
     setLocating(true)
     setLocationMessage('Requesting this device’s location…')
-    beginSources(['weather', 'ebird'])
+    beginSources(['weather', 'ebird', 'tide'])
     markWidgetRefreshing('weather')
     markWidgetRefreshing('ebird')
+    markWidgetRefreshing('tide')
     try {
       const position = await currentPosition()
       const capturedAt = new Date(position.timestamp || Date.now()).toISOString()
@@ -370,14 +368,13 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
       selector ? loadLocationSources(selector, true) : chooseLocation(),
       load('bookmarks', '/api/bookmarks', bookmarksEnvelopeSchema, {}, true),
       load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, true),
-      loadTide(true),
     ])
-  }, [beginSources, chooseLocation, load, loadLocationSources, loadTide, onAnnouncement, selector])
+  }, [beginSources, chooseLocation, load, loadLocationSources, onAnnouncement, selector])
 
   const retryWidget = useCallback(
     async (name: WidgetName) => {
       onAnnouncement?.(`${widgetLabels[name]} is refreshing; its saved reading remains visible.`)
-      if (name === 'weather' || name === 'ebird') {
+      if (name === 'weather' || name === 'ebird' || name === 'tide') {
         await loadLocationWidget(name, selector ?? { kind: 'home' }, true)
         return
       }
@@ -389,9 +386,8 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
         await load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, true)
         return
       }
-      await loadTide(true)
     },
-    [load, loadLocationWidget, loadTide, onAnnouncement, selector],
+    [load, loadLocationWidget, onAnnouncement, selector],
   )
 
   const acceptSavedBookmarks = useCallback(
@@ -418,9 +414,8 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
     }
     void load('bookmarks', '/api/bookmarks', bookmarksEnvelopeSchema, {}, false)
     void load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, false)
-    void loadTide(false)
     void chooseLocation()
-  }, [chooseLocation, initialCachedCount, load, loadTide, onAnnouncement])
+  }, [chooseLocation, initialCachedCount, load, onAnnouncement])
 
   const visibleSourceCount = widgetNames.filter((name) => data[name].status === 'ready').length
 

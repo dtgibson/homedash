@@ -3,6 +3,15 @@ import { loadConfig } from './config'
 import { classifyTideDirection, TideService } from './tide'
 
 const NOW = Date.parse('2026-09-09T19:00:00.000Z')
+const LOCATION = {
+  latitude: 37.771954,
+  longitude: -122.30026,
+  provenance: {
+    kind: 'current' as const,
+    label: 'Current device location',
+    capturedAt: '2026-09-09T18:59:00.000Z',
+  },
+}
 
 const predictionPoints = [
   { t: '2026-09-09 07:00', v: '0.8' },
@@ -45,18 +54,22 @@ function providerFetch({
   points = predictionPoints,
   turns = tideTurns,
   observed = observations,
+  stationId = '9414290',
+  stationName = 'San Francisco',
 }: {
   failObservations?: boolean
   malformedPredictions?: boolean
   points?: typeof predictionPoints
   turns?: typeof tideTurns
   observed?: typeof observations
+  stationId?: string
+  stationName?: string
 } = {}) {
   return vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = new URL(String(input))
     expect(url.origin).toBe('https://api.tidesandcurrents.noaa.gov')
     expect(url.pathname).toBe('/api/prod/datagetter')
-    expect(url.searchParams.get('station')).toBe('9414290')
+    expect(url.searchParams.get('station')).toBe(stationId)
     expect(url.searchParams.get('datum')).toBe('MLLW')
     expect(url.searchParams.get('units')).toBe('english')
     expect(url.searchParams.get('time_zone')).toBe('gmt')
@@ -66,7 +79,10 @@ function providerFetch({
     const product = url.searchParams.get('product')
     if (product === 'water_level') {
       if (failObservations) return new Response('unavailable', { status: 503 })
-      return Response.json({ metadata: observationMetadata, data: observed })
+      return Response.json({
+        metadata: { ...observationMetadata, id: stationId, name: stationName },
+        data: observed,
+      })
     }
     if (url.searchParams.get('interval') === 'hilo') {
       return Response.json({ predictions: turns })
@@ -88,9 +104,10 @@ describe('tide normalization and fallback', () => {
   })
 
   it('returns the latest eligible observation, next turn, and private-label-only provenance', async () => {
-    const service = new TideService(tideConfig(), providerFetch() as typeof fetch, () => NOW)
+    const fetchMock = providerFetch()
+    const service = new TideService(tideConfig(), fetchMock as typeof fetch, () => NOW)
 
-    const envelope = await service.load('America/Los_Angeles')
+    const envelope = await service.load(LOCATION, 'America/Los_Angeles')
 
     expect(envelope.data.current).toEqual({
       at: '2026-09-09T19:00:00.000Z',
@@ -110,6 +127,10 @@ describe('tide normalization and fallback', () => {
       issues: [],
     })
     expect(JSON.stringify(envelope)).not.toContain('9414290')
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls.every(([input]) => !String(input).includes('stations.json'))).toBe(
+      true,
+    )
   })
 
   it('keeps predictions usable and labels the result partial when observations fail', async () => {
@@ -119,7 +140,7 @@ describe('tide normalization and fallback', () => {
       () => NOW,
     )
 
-    const envelope = await service.load('America/Los_Angeles')
+    const envelope = await service.load(LOCATION, 'America/Los_Angeles')
 
     expect(envelope.data.current).toMatchObject({
       at: '2026-09-09T19:00:00.000Z',
@@ -144,10 +165,10 @@ describe('tide normalization and fallback', () => {
       return providerFetch({ malformedPredictions: malformed })(input, init)
     })
     const service = new TideService(tideConfig(), fetchMock as typeof fetch, () => NOW)
-    const original = await service.load('America/Los_Angeles')
+    const original = await service.load(LOCATION, 'America/Los_Angeles')
 
     malformed = true
-    const fallback = await service.load('America/Los_Angeles', true)
+    const fallback = await service.load(LOCATION, 'America/Los_Angeles', true)
 
     expect(fallback.data).toEqual(original.data)
     expect(fallback.meta.freshness).toBe('stale')
@@ -164,7 +185,7 @@ describe('tide normalization and fallback', () => {
       () => NOW,
     )
 
-    await expect(service.load('America/Los_Angeles')).rejects.toMatchObject({
+    await expect(service.load(LOCATION, 'America/Los_Angeles')).rejects.toMatchObject({
       code: 'upstream-unavailable',
     })
   })
@@ -178,7 +199,7 @@ describe('tide normalization and fallback', () => {
       () => NOW,
     )
 
-    await expect(service.load('America/Los_Angeles')).rejects.toMatchObject({
+    await expect(service.load(LOCATION, 'America/Los_Angeles')).rejects.toMatchObject({
       code: 'upstream-unavailable',
     })
   })
@@ -195,7 +216,7 @@ describe('tide normalization and fallback', () => {
       () => lateNow,
     )
 
-    const envelope = await service.load('America/Los_Angeles')
+    const envelope = await service.load(LOCATION, 'America/Los_Angeles')
 
     expect(envelope.data.nextTurn.at).toBe('2026-09-10T07:05:00.000Z')
     expect(envelope.data.predictions.at(-1)?.at).toBe('2026-09-10T07:06:00.000Z')
@@ -222,7 +243,7 @@ describe('tide normalization and fallback', () => {
       () => NOW + 2 * 60_000,
     )
 
-    const envelope = await service.load('America/Los_Angeles')
+    const envelope = await service.load(LOCATION, 'America/Los_Angeles')
     const returnedTimes = envelope.data.predictions.map((point) => point.at)
 
     expect(envelope.data.predictions.length).toBeLessThan(60)
@@ -237,10 +258,159 @@ describe('tide normalization and fallback', () => {
     const fetchMock = providerFetch()
     const service = new TideService(tideConfig(), fetchMock as typeof fetch, () => NOW)
 
-    await expect(service.load('Not/A_Time_Zone')).rejects.toMatchObject({
+    await expect(service.load(LOCATION, 'Not/A_Time_Zone')).rejects.toMatchObject({
       code: 'invalid-configuration',
       statusCode: 400,
     })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('selects and caches the nearest eligible NOAA station without sending location', async () => {
+    const productFetch = providerFetch({ stationId: '9414750', stationName: 'Alameda' })
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (url.pathname.endsWith('/stations.json')) {
+        expect(url.searchParams.get('type')).toBe('waterlevels')
+        expect(url.search).not.toContain('37.771954')
+        expect(url.search).not.toContain('-122.30026')
+        return Response.json({
+          stations: [
+            {
+              id: 'not valid',
+              name: 'Ignored',
+              lat: 37.77,
+              lng: -122.3,
+              tidal: true,
+              observedst: true,
+            },
+            {
+              id: '9414290',
+              name: 'San Francisco',
+              lat: 37.806305,
+              lng: -122.46589,
+              tidal: true,
+              observedst: true,
+            },
+            {
+              id: '9414748',
+              name: 'Invalid\nname',
+              lat: 37.771954,
+              lng: -122.30026,
+              tidal: true,
+              observedst: true,
+            },
+            {
+              id: '9414749',
+              name: 'Closer but non-tidal',
+              lat: 37.771954,
+              lng: -122.30026,
+              tidal: false,
+              observedst: true,
+            },
+            {
+              id: '9414751',
+              name: 'Closer but not observed',
+              lat: 37.771954,
+              lng: -122.30026,
+              tidal: true,
+              observedst: false,
+            },
+            {
+              id: '9414750',
+              name: 'Alameda',
+              lat: 37.771954,
+              lng: -122.30026,
+              tidal: true,
+              observedst: true,
+            },
+          ],
+        })
+      }
+      return productFetch(input, init)
+    })
+    const service = new TideService(loadConfig({}), fetchMock as typeof fetch, () => NOW)
+
+    const first = await service.load(LOCATION, 'America/Los_Angeles')
+    const second = await service.load(LOCATION, 'America/Los_Angeles')
+
+    expect(first.data.station.label).toBe('Alameda')
+    expect(first.meta.location).toEqual(LOCATION.provenance)
+    expect(second.data).toEqual(first.data)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(JSON.stringify(first)).not.toContain('9414750')
+  })
+
+  it.each([
+    ['unavailable', () => new Response('unavailable', { status: 503 })],
+    ['malformed', () => Response.json({ stations: 'not-an-array' })],
+    ['empty', () => Response.json({ stations: [] })],
+    [
+      'without eligible stations',
+      () =>
+        Response.json({
+          stations: [
+            {
+              id: '9414750',
+              name: 'Alameda',
+              lat: 37.771954,
+              lng: -122.30026,
+              tidal: true,
+              observedst: false,
+            },
+          ],
+        }),
+    ],
+    [
+      'over the entry limit',
+      () =>
+        Response.json({
+          stations: Array.from({ length: 1_001 }, (_, index) => ({
+            id: String(index),
+            name: `Station ${index}`,
+            lat: 37,
+            lng: -122,
+            tidal: true,
+            observedst: true,
+          })),
+        }),
+    ],
+    [
+      'over the declared body limit',
+      () =>
+        new Response('{}', {
+          headers: { 'content-length': String(1024 * 1024 + 1) },
+        }),
+    ],
+    ['over the streamed body limit', () => new Response('x'.repeat(1024 * 1024 + 1))],
+  ])('fails tide safely when the station catalog is %s', async (_case, catalogResponse) => {
+    const fetchMock = vi.fn(async () => catalogResponse())
+    const service = new TideService(loadConfig({}), fetchMock as typeof fetch, () => NOW)
+
+    await expect(service.load(LOCATION, 'America/Los_Angeles')).rejects.toMatchObject({
+      code: 'upstream-unavailable',
+      statusCode: 502,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/stations.json?type=waterlevels')
+  })
+
+  it('times out a station catalog body that stops making progress', async () => {
+    const stalledBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"stations":['))
+      },
+    })
+    const fetchMock = vi.fn(async () => new Response(stalledBody))
+    const service = new TideService(
+      loadConfig({ UPSTREAM_TIMEOUT_MS: '500' }),
+      fetchMock as typeof fetch,
+      () => NOW,
+    )
+
+    await expect(service.load(LOCATION, 'America/Los_Angeles')).rejects.toMatchObject({
+      code: 'timeout',
+      statusCode: 504,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

@@ -7,6 +7,12 @@ import { buildApp } from './app'
 import { loadConfig } from './config'
 
 const apps: Array<Awaited<ReturnType<typeof buildApp>>> = []
+const location = {
+  kind: 'current' as const,
+  latitude: 37.771954,
+  longitude: -122.30026,
+  capturedAt: '2026-09-09T18:59:00.000Z',
+}
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()))
@@ -43,12 +49,34 @@ function noaaFetch() {
     .map((at, index) => ({ t: providerTime(at), v: String(0.8 + index * 0.2) }))
   return vi.fn(async (input: string | URL) => {
     const url = new URL(String(input))
+    if (url.pathname.endsWith('/stations.json')) {
+      return Response.json({
+        stations: [
+          {
+            id: '9414290',
+            name: 'San Francisco',
+            lat: 37.806305,
+            lng: -122.46589,
+            tidal: true,
+            observedst: true,
+          },
+          {
+            id: '9414750',
+            name: 'Alameda',
+            lat: 37.771954,
+            lng: -122.30026,
+            tidal: true,
+            observedst: true,
+          },
+        ],
+      })
+    }
     const product = url.searchParams.get('product')
     if (product === 'water_level') {
       return Response.json({
         metadata: {
-          id: '9414290',
-          name: 'San Francisco',
+          id: url.searchParams.get('station'),
+          name: 'Selected station',
           lat: '37.8063',
           lon: '-122.4659',
         },
@@ -79,7 +107,7 @@ function noaaFetch() {
 }
 
 describe('tide API boundary', () => {
-  it('accepts only a time zone and returns no-store normalized data without the station ID', async () => {
+  it('accepts the shared location and returns no-store normalized data without the station ID', async () => {
     const fetchMock = noaaFetch()
     const app = await buildApp({
       config: await testConfig(),
@@ -92,7 +120,7 @@ describe('tide API boundary', () => {
       method: 'POST',
       url: '/api/tide',
       headers: { 'content-type': 'application/json' },
-      payload: { timeZone: 'UTC' },
+      payload: { location, timeZone: 'UTC' },
     })
 
     expect(response.statusCode).toBe(200)
@@ -110,7 +138,7 @@ describe('tide API boundary', () => {
         method: 'POST' as const,
         url: '/api/tide?station=evil',
         headers: { 'content-type': 'application/json' },
-        payload: { timeZone: 'America/Los_Angeles' },
+        payload: { location, timeZone: 'America/Los_Angeles' },
       },
       status: 400,
     },
@@ -120,7 +148,7 @@ describe('tide API boundary', () => {
         method: 'POST' as const,
         url: '/api/tide',
         headers: { 'content-type': 'application/json' },
-        payload: { timeZone: 'America/Los_Angeles', station: 'evil' },
+        payload: { location, timeZone: 'America/Los_Angeles', station: 'evil' },
       },
       status: 400,
     },
@@ -130,7 +158,7 @@ describe('tide API boundary', () => {
         method: 'POST' as const,
         url: '/api/tide',
         headers: { 'content-type': 'application/json' },
-        payload: { timeZone: 'Invalid/Zone' },
+        payload: { location, timeZone: 'Invalid/Zone' },
       },
       status: 400,
     },
@@ -171,7 +199,7 @@ describe('tide API boundary', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('keeps a missing private station isolated to a safe tide error', async () => {
+  it('automatically selects the nearest eligible station when no private override exists', async () => {
     const fetchMock = noaaFetch()
     const app = await buildApp({
       config: await testConfig(false),
@@ -184,16 +212,12 @@ describe('tide API boundary', () => {
       method: 'POST',
       url: '/api/tide',
       headers: { 'content-type': 'application/json' },
-      payload: { timeZone: 'America/Los_Angeles' },
+      payload: { location, timeZone: 'America/Los_Angeles' },
     })
 
-    expect(response.statusCode).toBe(503)
-    expect(response.json()).toEqual({
-      schemaVersion: 1,
-      code: 'missing-configuration',
-      message: 'The local tide station is not configured.',
-      retryable: false,
-    })
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toContain('Alameda')
+    expect(response.body).not.toContain('9414750')
+    expect(fetchMock).toHaveBeenCalledTimes(4)
   })
 })

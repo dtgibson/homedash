@@ -10,15 +10,20 @@ import type { AppConfig } from './config.js'
 import { MemoryCache } from './cache.js'
 import { asSourceError, SourceError } from './errors.js'
 import { fetchWithTimeout } from './fetch.js'
-import type { FetchLike } from './types.js'
+import type { FetchLike, ResolvedLocation } from './types.js'
 
 const NOAA_ENDPOINT = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter'
+const NOAA_STATION_ENDPOINT =
+  'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=waterlevels'
 const PROVIDER_BODY_LIMIT = 512 * 1024
+const STATION_CATALOG_BODY_LIMIT = 1024 * 1024
 const OBSERVATION_CACHE_MS = 5 * 60_000
 const PREDICTION_CACHE_MS = 60 * 60_000
+const STATION_CATALOG_CACHE_MS = 24 * 60 * 60_000
 const TIDE_STALE_MS = 15 * 60_000
 const OBSERVATION_MAX_AGE_MS = 60 * 60_000
 const LAST_GOOD_LIMIT = 8
+const STATION_CACHE_LIMIT = 8
 
 const providerPointSchema = z
   .object({
@@ -61,9 +66,37 @@ const turnResponseSchema = z
   })
   .strict()
 
+const providerStationSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9]{1,16}$/),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .refine((value) => !/[\p{Cc}\u2028\u2029]/u.test(value)),
+  lat: z.number().finite().min(-90).max(90),
+  lng: z.number().finite().min(-180).max(180),
+  tidal: z.literal(true),
+  observedst: z.literal(true),
+})
+
+const stationCatalogSchema = z.object({
+  stations: z.array(z.unknown()).max(1_000),
+})
+
 interface PredictionBundle {
   points: TidePoint[]
   turns: TideTurn[]
+}
+
+interface TideStation {
+  id: string
+  label: string
+}
+
+interface CatalogTideStation extends TideStation {
+  latitude: number
+  longitude: number
 }
 
 function roundHeight(value: number) {
@@ -158,9 +191,9 @@ function requestWindow(now: number) {
   }
 }
 
-async function boundedJson(response: Response) {
+async function boundedJson(response: Response, bodyLimit: number, bodyTimeoutMs: number) {
   const contentLength = Number(response.headers.get('content-length'))
-  if (Number.isFinite(contentLength) && contentLength > PROVIDER_BODY_LIMIT) {
+  if (Number.isFinite(contentLength) && contentLength > bodyLimit) {
     throw new Error('tide-payload-too-large')
   }
   if (!response.body) throw new Error('invalid-tide-json')
@@ -168,23 +201,87 @@ async function boundedJson(response: Response) {
   const decoder = new TextDecoder('utf-8', { fatal: true })
   let size = 0
   let text = ''
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > PROVIDER_BODY_LIMIT) {
-        await reader.cancel()
-        throw new Error('tide-payload-too-large')
+  let timedOut = false
+  const timeoutError = new SourceError('timeout', 'Tide data took too long to respond.', true, 504)
+  const readAndParse = async () => {
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        size += value.byteLength
+        if (size > bodyLimit) {
+          void reader.cancel().catch(() => undefined)
+          throw new Error('tide-payload-too-large')
+        }
+        text += decoder.decode(value, { stream: true })
       }
-      text += decoder.decode(value, { stream: true })
+      text += decoder.decode()
+      return JSON.parse(text) as unknown
+    } catch {
+      if (timedOut) throw timeoutError
+      if (size > bodyLimit) throw new Error('tide-payload-too-large')
+      throw new Error('invalid-tide-json')
     }
-    text += decoder.decode()
-    return JSON.parse(text) as unknown
-  } catch {
-    if (size > PROVIDER_BODY_LIMIT) throw new Error('tide-payload-too-large')
-    throw new Error('invalid-tide-json')
   }
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const bodyTimeout = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      timedOut = true
+      void reader.cancel().catch(() => undefined)
+      reject(timeoutError)
+    }, bodyTimeoutMs)
+  })
+  try {
+    return await Promise.race([readAndParse(), bodyTimeout])
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function parseStationCatalog(payload: unknown): CatalogTideStation[] {
+  const catalog = stationCatalogSchema.safeParse(payload)
+  if (!catalog.success) throw new Error('invalid-tide-station-catalog')
+  const stations = catalog.data.stations.flatMap((candidate) => {
+    const parsed = providerStationSchema.safeParse(candidate)
+    if (!parsed.success) return []
+    return [
+      {
+        id: parsed.data.id,
+        label: parsed.data.name,
+        latitude: parsed.data.lat,
+        longitude: parsed.data.lng,
+      },
+    ]
+  })
+  if (!stations.length) throw new Error('empty-tide-station-catalog')
+  return stations
+}
+
+function radians(value: number) {
+  return (value * Math.PI) / 180
+}
+
+export function tideStationDistanceKm(location: ResolvedLocation, station: CatalogTideStation) {
+  const latitudeDelta = radians(station.latitude - location.latitude)
+  const longitudeDelta = radians(station.longitude - location.longitude)
+  const latitude = radians(location.latitude)
+  const stationLatitude = radians(station.latitude)
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(latitude) * Math.cos(stationLatitude) * Math.sin(longitudeDelta / 2) ** 2
+  return 6_371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(Math.max(0, 1 - haversine)))
+}
+
+export function nearestTideStation(location: ResolvedLocation, stations: CatalogTideStation[]) {
+  const ranked = stations
+    .map((station) => ({ station, distanceKm: tideStationDistanceKm(location, station) }))
+    .sort(
+      (left, right) =>
+        left.distanceKm - right.distanceKm || left.station.id.localeCompare(right.station.id),
+    )
+  const nearest = ranked[0]?.station
+  if (!nearest) throw new Error('empty-tide-station-catalog')
+  return nearest
 }
 
 function interpolateCurrent(points: TidePoint[], now: number) {
@@ -289,10 +386,11 @@ function downsamplePredictions(points: TidePoint[], turns: TideTurn[], now: numb
 }
 
 function normalizeEnvelope(
-  config: Extract<AppConfig['tide'], { status: 'ready' }>,
+  station: TideStation,
   predictions: PredictionBundle,
   observations: TidePoint[],
   observationIssue: ApiIssue | null,
+  location: ResolvedLocation,
   timeZone: string,
   now: number,
 ): TideEnvelope {
@@ -352,7 +450,7 @@ function normalizeEnvelope(
   const candidate = {
     schemaVersion: 1 as const,
     data: {
-      station: { label: config.stationLabel, datum: 'MLLW' as const, units: 'feet' as const },
+      station: { label: station.label, datum: 'MLLW' as const, units: 'feet' as const },
       current,
       nextTurn,
       predictions: pointsForWindow,
@@ -364,14 +462,16 @@ function normalizeEnvelope(
       freshness: issues.length ? ('partial' as const) : ('fresh' as const),
       staleAfterMs: TIDE_STALE_MS,
       issues,
+      location: location.provenance,
     },
   }
   return tideEnvelopeSchema.parse(candidate)
 }
 
 export class TideService {
-  private readonly observationCache = new MemoryCache<TidePoint[]>()
-  private readonly predictionCache = new MemoryCache<PredictionBundle>()
+  private readonly stationCatalogCache = new MemoryCache<CatalogTideStation[]>(1)
+  private readonly observationCache = new MemoryCache<TidePoint[]>(STATION_CACHE_LIMIT)
+  private readonly predictionCache = new MemoryCache<PredictionBundle>(STATION_CACHE_LIMIT)
   private readonly lastGood = new Map<string, TideEnvelope>()
 
   constructor(
@@ -380,34 +480,37 @@ export class TideService {
     private readonly now: () => number = Date.now,
   ) {}
 
-  async load(timeZone: string, force = false): Promise<TideEnvelope> {
+  async load(location: ResolvedLocation, timeZone: string, force = false): Promise<TideEnvelope> {
     if (!validTimeZone(timeZone)) {
       throw new SourceError('invalid-configuration', 'The tide time zone is invalid.', false, 400)
     }
-    if (this.config.tide.status !== 'ready') {
-      const missing = this.config.tide.reason === 'missing-station'
+    if (this.config.tide.mode === 'unavailable') {
       throw new SourceError(
-        missing ? 'missing-configuration' : 'invalid-configuration',
-        missing
-          ? 'The local tide station is not configured.'
-          : 'The local tide station configuration is invalid.',
+        'invalid-configuration',
+        'The local tide station configuration is invalid.',
         false,
         503,
       )
     }
 
     const now = this.now()
-    const stationId = this.config.tide.stationId
-    const previous = this.lastGood.get(timeZone)
+    let station: TideStation
+    try {
+      station = await this.selectStation(location)
+    } catch (error) {
+      throw asSourceError(error, 'Tide could not be reached.')
+    }
+    const previousKey = `${station.id}:${timeZone}`
+    const previous = this.lastGood.get(previousKey)
     try {
       const predictionPromise = this.predictionCache.load(
-        this.config.tide.stationId,
+        station.id,
         PREDICTION_CACHE_MS,
         force,
-        () => this.loadPredictions(now),
+        () => this.loadPredictions(now, station.id),
       )
       const observationPromise = this.observationCache
-        .load(stationId, OBSERVATION_CACHE_MS, force, () => this.loadObservations(now, stationId))
+        .load(station.id, OBSERVATION_CACHE_MS, force, () => this.loadObservations(now, station.id))
         .then((value) => ({ status: 'fulfilled' as const, value }))
         .catch((error: unknown) => ({ status: 'rejected' as const, error }))
 
@@ -425,14 +528,15 @@ export class TideService {
             }
           : null
       const envelope = normalizeEnvelope(
-        this.config.tide,
+        station,
         predictions,
         observationResult.status === 'fulfilled' ? observationResult.value : [],
         observationIssue,
+        location,
         timeZone,
         now,
       )
-      this.remember(timeZone, envelope)
+      this.remember(previousKey, envelope)
       return envelope
     } catch (error) {
       if (previous) {
@@ -456,39 +560,70 @@ export class TideService {
     }
   }
 
-  private remember(timeZone: string, envelope: TideEnvelope) {
-    if (!this.lastGood.has(timeZone) && this.lastGood.size >= LAST_GOOD_LIMIT) {
+  private async selectStation(location: ResolvedLocation): Promise<TideStation> {
+    if (this.config.tide.mode === 'fixed') {
+      return {
+        id: this.config.tide.stationId,
+        label: this.config.tide.stationLabel,
+      }
+    }
+    const stations = await this.stationCatalogCache.load(
+      'waterlevels',
+      STATION_CATALOG_CACHE_MS,
+      false,
+      () => this.loadStationCatalog(),
+    )
+    return nearestTideStation(location, stations)
+  }
+
+  private async loadStationCatalog() {
+    const response = await fetchWithTimeout(
+      this.fetchImpl,
+      NOAA_STATION_ENDPOINT,
+      { headers: { accept: 'application/json' } },
+      this.config.upstreamTimeoutMs,
+      'NOAA Tides & Currents',
+    )
+    return parseStationCatalog(
+      await boundedJson(response, STATION_CATALOG_BODY_LIMIT, this.config.upstreamTimeoutMs),
+    )
+  }
+
+  private remember(cacheKey: string, envelope: TideEnvelope) {
+    if (!this.lastGood.has(cacheKey) && this.lastGood.size >= LAST_GOOD_LIMIT) {
       const oldest = this.lastGood.keys().next().value
       if (oldest) this.lastGood.delete(oldest)
     }
-    this.lastGood.delete(timeZone)
-    this.lastGood.set(timeZone, envelope)
+    this.lastGood.delete(cacheKey)
+    this.lastGood.set(cacheKey, envelope)
   }
 
   private async loadObservations(now: number, stationId: string) {
     const window = requestWindow(now)
-    const response = await this.fetchProduct({
+    const response = await this.fetchProduct(stationId, {
       product: 'water_level',
       begin_date: window.begin,
       end_date: window.end,
     })
-    const parsed = observationResponseSchema.safeParse(await boundedJson(response))
+    const parsed = observationResponseSchema.safeParse(
+      await boundedJson(response, PROVIDER_BODY_LIMIT, this.config.upstreamTimeoutMs),
+    )
     if (!parsed.success || parsed.data.metadata.id !== stationId || parsed.data.data.length === 0) {
       throw new Error('invalid-tide-observations')
     }
     return parsePoints(parsed.data.data)
   }
 
-  private async loadPredictions(now: number): Promise<PredictionBundle> {
+  private async loadPredictions(now: number, stationId: string): Promise<PredictionBundle> {
     const window = requestWindow(now)
     const [pointsResponse, turnsResponse] = await Promise.all([
-      this.fetchProduct({
+      this.fetchProduct(stationId, {
         product: 'predictions',
         begin_date: window.begin,
         end_date: window.end,
         interval: '6',
       }),
-      this.fetchProduct({
+      this.fetchProduct(stationId, {
         product: 'predictions',
         begin_date: window.begin,
         end_date: window.end,
@@ -496,8 +631,8 @@ export class TideService {
       }),
     ])
     const [pointsPayload, turnsPayload] = await Promise.all([
-      boundedJson(pointsResponse),
-      boundedJson(turnsResponse),
+      boundedJson(pointsResponse, PROVIDER_BODY_LIMIT, this.config.upstreamTimeoutMs),
+      boundedJson(turnsResponse, PROVIDER_BODY_LIMIT, this.config.upstreamTimeoutMs),
     ])
     const pointResult = predictionResponseSchema.safeParse(pointsPayload)
     const turnResult = turnResponseSchema.safeParse(turnsPayload)
@@ -515,10 +650,10 @@ export class TideService {
     }
   }
 
-  private async fetchProduct(values: Record<string, string>) {
+  private async fetchProduct(stationId: string, values: Record<string, string>) {
     const query = new URLSearchParams({
       ...values,
-      station: this.config.tide.status === 'ready' ? this.config.tide.stationId : '',
+      station: stationId,
       datum: 'MLLW',
       units: 'english',
       time_zone: 'gmt',

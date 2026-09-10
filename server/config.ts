@@ -10,8 +10,9 @@ type LlmdashLaunchDestination =
   { status: 'ready'; url: URL } | { status: 'unavailable'; reason: 'missing' | 'invalid' }
 
 type TideConfig =
-  | { status: 'ready'; stationId: string; stationLabel: string }
-  | { status: 'unavailable'; reason: 'missing-station' | 'invalid-station' | 'invalid-label' }
+  | { mode: 'automatic' }
+  | { mode: 'fixed'; stationId: string; stationLabel: string }
+  | { mode: 'unavailable'; reason: 'invalid-station' | 'invalid-label' }
 
 function parseAllowedOrigins(value: string | undefined, port: number) {
   const configured = value ?? `http://127.0.0.1:${port},http://127.0.0.1:5173`
@@ -70,15 +71,15 @@ function parseTideConfig(
   labelValue: string | undefined,
 ): TideConfig {
   const stationId = stationValue?.trim() ?? ''
-  if (!stationId) return { status: 'unavailable', reason: 'missing-station' }
+  if (!stationId) return { mode: 'automatic' }
   if (!/^[A-Za-z0-9]{1,16}$/.test(stationId)) {
-    return { status: 'unavailable', reason: 'invalid-station' }
+    return { mode: 'unavailable', reason: 'invalid-station' }
   }
   const stationLabel = labelValue?.trim() || 'Local tide'
   if ([...stationLabel].length > 100 || /[\p{Cc}\u2028\u2029]/u.test(stationLabel)) {
-    return { status: 'unavailable', reason: 'invalid-label' }
+    return { mode: 'unavailable', reason: 'invalid-label' }
   }
-  return { status: 'ready', stationId, stationLabel }
+  return { mode: 'fixed', stationId, stationLabel }
 }
 
 const envSchema = z

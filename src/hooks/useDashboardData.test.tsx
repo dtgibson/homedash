@@ -351,6 +351,70 @@ describe('cached dashboard refresh lifecycle', () => {
     expect(result.current.data.tide.status).toBe('loading')
   })
 
+  it('uses the recent last-known location for tide when current location is denied', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-10T12:00:00.000Z'))
+    localStorage.setItem(
+      'homedash.location.v1',
+      JSON.stringify({
+        schemaVersion: 1,
+        latitude: 37.8,
+        longitude: -122.3,
+        capturedAt,
+      }),
+    )
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (_success: PositionCallback, failure: PositionErrorCallback) =>
+          failure({ code: 1 } as GeolocationPositionError),
+      },
+    })
+    const values = envelopes({ locationKind: 'last-known' })
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      const key = paths[pathFor(input) as keyof typeof paths]
+      return Promise.resolve(response(values[key]))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() => useDashboardData())
+    await waitFor(() => expect(result.current.isRefreshing).toBe(false))
+
+    const tideCall = fetchMock.mock.calls.find(([input]) => pathFor(input) === '/api/tide')
+    expect(JSON.parse(String(tideCall?.[1]?.body))).toMatchObject({
+      location: {
+        kind: 'last-known',
+        latitude: 37.8,
+        longitude: -122.3,
+        capturedAt,
+      },
+    })
+    now.mockRestore()
+  })
+
+  it('uses the Home location selector for tide when current and last-known are unavailable', async () => {
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (_success: PositionCallback, failure: PositionErrorCallback) =>
+          failure({ code: 1 } as GeolocationPositionError),
+      },
+    })
+    const values = envelopes({ locationKind: 'home' })
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      const key = paths[pathFor(input) as keyof typeof paths]
+      return Promise.resolve(response(values[key]))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() => useDashboardData())
+    await waitFor(() => expect(result.current.isRefreshing).toBe(false))
+
+    const tideCall = fetchMock.mock.calls.find(([input]) => pathFor(input) === '/api/tide')
+    expect(JSON.parse(String(tideCall?.[1]?.body))).toMatchObject({
+      location: { kind: 'home' },
+    })
+  })
+
   it('ignores a legacy eBird snapshot that cannot provide both complete orders', () => {
     const saved = envelopes().ebird
     const legacyData: Record<string, unknown> = { ...saved.data }
@@ -511,6 +575,16 @@ describe('cached dashboard refresh lifecycle', () => {
     expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({
       method: 'POST',
       headers: expect.objectContaining({ 'x-homedash-refresh': '1' }),
+    })
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({
+      location: {
+        kind: 'current',
+        schemaVersion: 1,
+        latitude: 37.77,
+        longitude: -122.42,
+        capturedAt,
+      },
+      timeZone: expect.any(String),
     })
   })
 })

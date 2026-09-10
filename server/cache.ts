@@ -8,6 +8,8 @@ export class MemoryCache<T> {
   private readonly records = new Map<string, CacheRecord<T>>()
   private readonly inflight = new Map<string, Promise<T>>()
 
+  constructor(private readonly maxEntries = Number.POSITIVE_INFINITY) {}
+
   get(key: string) {
     return this.records.get(key)
   }
@@ -22,6 +24,11 @@ export class MemoryCache<T> {
 
     const pending = loader()
       .then((value) => {
+        if (!this.records.has(key) && this.records.size >= this.maxEntries) {
+          const oldest = this.records.keys().next().value
+          if (oldest) this.records.delete(oldest)
+        }
+        this.records.delete(key)
         this.records.set(key, { value, fetchedAt: Date.now(), expiresAt: Date.now() + ttlMs })
         return value
       })

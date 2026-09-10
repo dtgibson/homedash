@@ -31,6 +31,7 @@ const ebirdRequestSchema = z.object({
 
 const tideRequestSchema = z
   .object({
+    location: locationSelectorSchema,
     timeZone: z.string().min(1).max(80),
   })
   .strict()
@@ -662,7 +663,11 @@ export async function buildApp(options: BuildAppOptions) {
       return reply.status(400).header('cache-control', 'no-store').send(tideRequestError())
     }
     try {
-      const envelope = await tide.load(parsed.data.timeZone, forceRefresh(request.headers))
+      const envelope = await tide.load(
+        resolveLocation(parsed.data.location, options.config),
+        parsed.data.timeZone,
+        forceRefresh(request.headers),
+      )
       return reply.header('cache-control', 'no-store').send(envelope)
     } catch (error) {
       const safe =

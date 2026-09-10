@@ -5,7 +5,7 @@
 **Source:** strategic-brief.md (approved)
 
 ## Feature Overview
-Homedash adds one independently refreshed local-tide reading and presents it with sunrise, sunset, and moon phase as a single day story. Dawn uses a full compact graphic; Dense uses the same facts with a restrained inline trace.
+Homedash adds one independently refreshed local-tide reading, automatically selects the nearest eligible NOAA station from the location already used for weather, and presents it with sunrise, sunset, and moon phase as a single day story. Dawn uses a full compact graphic; Dense uses the same facts with a restrained inline trace.
 
 ## User Stories
 
@@ -19,11 +19,13 @@ Homedash adds one independently refreshed local-tide reading and presents it wit
 
 > **US-05** — As the owner relying on several private sources, I want tide failures isolated and honestly labeled, so that weather, daylight, and moon context remain useful.
 
+> **US-06** — As the owner opening Homedash on a new device, I want local tide to use the same location choice as weather, so that it works without a second private configuration step.
+
 ## Functional Requirements
 
 ### Tide data and meaning
 
-> **FR-01** — The app shall load tide data for one station selected in private server configuration; the browser shall not select or submit a station.
+> **FR-01** — When no valid private station override exists, the app shall select the nearest eligible NOAA tidal water-level station to the resolved dashboard location; the browser shall not select or submit a station ID.
 
 > **FR-02** — The tide response shall identify the station with a human-readable label and shall not expose configured coordinates.
 
@@ -71,15 +73,23 @@ Homedash adds one independently refreshed local-tide reading and presents it wit
 
 > **FR-21** — The global refresh action shall include tide as a fifth independent source, update its accessible name and progress total, and settle each source in place.
 
-> **FR-22** — Retrying tide shall request only the tide source; global and location refreshes shall include tide when a usable current, last-known, or Home location is selected only if the server configuration requires that location for source resolution.
+> **FR-22** — Retrying tide shall request only the tide source with the current resolved location; global and location refreshes shall refresh tide beside weather and eBird so automatic station choice follows the active current, last-known, or Home selection.
 
 ### Privacy and source integrity
 
-> **FR-23** — The browser shall call only a same-origin Homedash endpoint; all tide-provider requests and credentials or station configuration shall remain server-side.
+> **FR-23** — The browser shall call only a same-origin Homedash endpoint; all tide-provider requests, station-catalog access, fixed station configuration, and selected station IDs shall remain server-side.
 
 > **FR-24** — Provider responses shall be schema-validated before caching or returning, and malformed, oversized, non-finite, or chronologically invalid points shall fail closed without replacing last-good state.
 
 > **FR-25** — The app shall use a fixed provider destination and bounded request behavior; no browser value may choose the upstream host, path, station, or datum.
+
+> **FR-26** — Automatic tide selection shall use the same resolved current-device, eligible recent last-known, then private Home fallback already used by weather; it shall not maintain a separate browser location or fallback order.
+
+> **FR-27** — A valid private `TIDE_STATION_ID` shall override automatic station selection, and an optional valid private label shall replace that station's public display name without exposing the ID.
+
+> **FR-28** — Automatic selection shall compare the resolved location against a generic server-fetched NOAA station catalog locally; device and Home coordinates shall not be sent to NOAA for station discovery.
+
+> **FR-29** — Only catalog entries that are tidal, actively observed water-level stations with valid bounded identifiers, names, and coordinates shall be eligible; malformed or empty catalogs shall fail only the tide source.
 
 ## Non-Functional Requirements
 
@@ -89,7 +99,7 @@ Homedash adds one independently refreshed local-tide reading and presents it wit
 
 > **NFR-03 — Responsive layout:** The normal payload shall preserve the no-document-scroll targets at 1440×900 and 360×800 in Dawn and Dense; exceptional overflow shall remain bounded to the affected source region.
 
-> **NFR-04 — Performance:** Tide work shall run concurrently with other sources, use the existing bounded upstream timeout, and never extend another source's loading lifecycle.
+> **NFR-04 — Performance:** Tide work shall run concurrently with other sources, use the existing bounded upstream timeout, cache the bounded NOAA station catalog for at least one day, and never extend another source's loading lifecycle.
 
 > **NFR-05 — Freshness:** Source time, snapshot age, refreshing, up-to-date, partial, stale, and failed states shall follow the existing source-freshness language.
 
@@ -104,6 +114,7 @@ Homedash adds one independently refreshed local-tide reading and presents it wit
 ## Out of Scope
 
 - Browser station search, station selection, maps, or arbitrary provider URLs.
+- Hydrological region modeling beyond nearest eligible station; the private override remains available when geometric proximity is not the preferred reference.
 - Tide alerts, notifications, historical comparison, favorites, or calendars.
 - Currents, waves, swell, marine forecasts, water temperature, or boating guidance.
 - A database or retained tide history beyond the existing bounded caches and last-good snapshot.
@@ -112,13 +123,13 @@ Homedash adds one independently refreshed local-tide reading and presents it wit
 
 ## Open Questions
 
-None — all decisions are resolved in this document. The station is private server configuration, feet are the display unit, the configured provider's standard local datum is labeled in source metadata, and observations fall back to clearly labeled predictions.
+None — all decisions are resolved in this document. Automatic selection uses the shared location chain, a fixed private station remains an override, feet are the display unit, NOAA's standard local datum is labeled in source metadata, and observations fall back to clearly labeled predictions.
 
 ## Success Metrics
 
 | ID | What's Being Verified | Pass Condition |
 |---|---|---|
-| QA-01 | Private station ownership | The browser cannot select a station or provider; one configured station label is returned without coordinates. |
+| QA-01 | Automatic station ownership | With no override, the server chooses the nearest eligible NOAA station for current, recent last-known, and Home locations and returns only its public label, never its ID or coordinates. A valid fixed station overrides that choice. |
 | QA-02 | Current tide value | An eligible observation displays height, source time, `observed`, and the correct rising/falling/near-slack label. |
 | QA-03 | Predicted fallback | With no eligible observation and valid predictions, a current interpolated value appears labeled `predicted`. |
 | QA-04 | Direction threshold | Changes below 0.05 feet resolve to near slack; larger positive/negative changes resolve to rising/falling. |
@@ -128,9 +139,10 @@ None — all decisions are resolved in this document. The station is private ser
 | QA-08 | Moon wording | Moon phase remains visible without text claiming it determines the local tide. |
 | QA-09 | Independent failure | Tide loading/error/partial states do not blank or delay weather, daylight, moon, or other sources. |
 | QA-10 | Saved-first refresh | A valid last-good tide snapshot renders during refresh and survives a failed refresh with honest age/state. |
-| QA-11 | Refresh behavior | Global refresh names and tracks five sources; tide-only retry requests only tide. |
+| QA-11 | Refresh behavior | Global and location refreshes name and track five sources, tide follows the active shared location, and tide-only retry requests only tide with that location. |
 | QA-12 | Validation | Malformed or invalid provider data is rejected and never replaces valid cached state. |
-| QA-13 | Privacy and destination | No coordinates or private station configuration enter browser URLs/logs; upstream destination is fixed server-side. |
+| QA-13 | Privacy and destination | No coordinates or private station IDs enter browser URLs, responses, or logs; NOAA receives only the server-selected station ID for product data, not the location used to select it, and every upstream destination is fixed server-side. |
+| QA-17 | Station catalog resilience | A bounded, validated NOAA catalog selects only eligible tidal water-level stations, is reused from cache, and malformed, oversized, empty, or unavailable catalog data fails only tide without disturbing other sources. |
 | QA-14 | Accessibility | All graphic meaning is available as text and no status depends on color alone. |
 | QA-15 | Responsive acceptance | Dawn and Dense remain contained at 1440×900 and 360×800 in light and dark appearances. |
 | QA-16 | Regression | Existing weather, daylight, moon, refresh, caching, and appearance/view behavior remains green. |

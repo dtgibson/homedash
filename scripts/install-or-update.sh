@@ -178,7 +178,7 @@ else
   fi
   if ! grep -Eq '^[[:space:]]*TIDE_STATION_ID=' .env; then
     printf '\nTIDE_STATION_ID=\n' >>.env
-    printf 'Added an optional private tide-station placeholder.\n'
+    printf 'Enabled automatic tide-station selection; the private station override is blank.\n'
   fi
   if ! grep -Eq '^[[:space:]]*TIDE_STATION_LABEL=' .env; then
     printf 'TIDE_STATION_LABEL=Local tide\n' >>.env
