@@ -5,6 +5,7 @@ import {
   FAVICON_BODY_LIMIT_BYTES,
   FAVICON_ICO_MAX_ENTRIES,
   FaviconResolver,
+  isPublicFaviconAddress,
   validateFavicon,
 } from './favicon'
 
@@ -324,6 +325,12 @@ describe('favicon image validation', () => {
     expect(validateFavicon(png(), 'application/octet-stream')).not.toBeNull()
   })
 
+  it('normalizes a raster favicon served under an icon container media type', () => {
+    expect(validateFavicon(png(), 'image/vnd.microsoft.icon')).toMatchObject({
+      mimeType: 'image/png',
+    })
+  })
+
   it('rejects a PNG with a corrupt chunk checksum', () => {
     const corrupted = Buffer.from(png())
     corrupted[corrupted.length - 1] ^= 1
@@ -370,11 +377,43 @@ describe('FaviconResolver', () => {
     }
   })
 
+  it('follows one HTTPS redirect origin through a public-address-pinned dispatcher', async () => {
+    const requests: Array<{ url: string; init?: RequestInit & { dispatcher?: unknown } }> = []
+    const resolver = new FaviconResolver(
+      vi.fn(async (input, init) => {
+        requests.push({ url: input.toString(), init })
+        return requests.length === 1
+          ? new Response(null, {
+              status: 302,
+              headers: { location: 'https://static.cdn.example/icons/site.ico' },
+            })
+          : imageResponse()
+      }) as typeof fetch,
+    )
+
+    await expect(
+      resolver.resolve(bookmark('0123456789abcdef', 'https://origin.example/path')),
+    ).resolves.toMatchObject({ kind: 'success' })
+    expect(requests.map(({ url }) => url)).toEqual([
+      'https://origin.example/favicon.ico',
+      'https://static.cdn.example/icons/site.ico',
+    ])
+    expect(requests[0]!.init).not.toHaveProperty('dispatcher')
+    expect(requests[1]!.init?.dispatcher).toBeDefined()
+    expect(requests[1]!.init).toMatchObject({
+      credentials: 'omit',
+      redirect: 'manual',
+      referrerPolicy: 'no-referrer',
+    })
+  })
+
   it.each([
     ['scheme', 'http://origin.example/next.ico'],
-    ['hostname', 'https://other.example/next.ico'],
     ['port', 'https://origin.example:444/next.ico'],
     ['credentials', 'https://user:secret@origin.example/next.ico'],
+    ['loopback address', 'https://127.0.0.1/next.ico'],
+    ['local IPv6 address', 'https://[::1]/next.ico'],
+    ['local hostname', 'https://service.local/next.ico'],
   ])('rejects a redirect with changed %s before contacting it', async (_name, location) => {
     const requested: string[] = []
     const resolver = new FaviconResolver(
@@ -387,6 +426,49 @@ describe('FaviconResolver', () => {
       resolver.resolve(bookmark('0123456789abcdef', 'https://origin.example/path')),
     ).resolves.toEqual({ kind: 'unavailable' })
     expect(requested).toEqual(['https://origin.example/favicon.ico'])
+  })
+
+  it('rejects a second cross-origin redirect before contacting it', async () => {
+    const requested: string[] = []
+    const resolver = new FaviconResolver(
+      vi.fn(async (input) => {
+        requested.push(input.toString())
+        return new Response(null, {
+          status: 302,
+          headers: {
+            location:
+              requested.length === 1
+                ? 'https://static.cdn.example/site.ico'
+                : 'https://other-cdn.example/site.ico',
+          },
+        })
+      }) as typeof fetch,
+    )
+    await expect(
+      resolver.resolve(bookmark('0123456789abcdef', 'https://origin.example/path')),
+    ).resolves.toEqual({ kind: 'unavailable' })
+    expect(requested).toEqual([
+      'https://origin.example/favicon.ico',
+      'https://static.cdn.example/site.ico',
+    ])
+  })
+
+  it.each([
+    ['8.8.8.8', true],
+    ['2606:4700:4700::1111', true],
+    ['127.0.0.1', false],
+    ['10.0.0.1', false],
+    ['100.64.1.1', false],
+    ['169.254.1.1', false],
+    ['192.168.1.1', false],
+    ['::1', false],
+    ['::ffff:127.0.0.1', false],
+    ['2001:db8::1', false],
+    ['3fff::1', false],
+    ['fc00::1', false],
+    ['fe80::1', false],
+  ])('classifies redirect address %s as public=%s', (address, expected) => {
+    expect(isPublicFaviconAddress(address)).toBe(expected)
   })
 
   it('rejects a third redirect without contacting the fourth destination', async () => {

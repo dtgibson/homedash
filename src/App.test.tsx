@@ -7,7 +7,7 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
   const meta = {
     generatedAt: now,
     sourceUpdatedAt: now,
-    freshness: 'fresh' as 'fresh' | 'stale',
+    freshness: 'fresh' as 'fresh' | 'partial' | 'stale',
     staleAfterMs: 60_000,
     issues: [],
   }
@@ -64,7 +64,7 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
           data: {
             schemaVersion: 1 as const,
             data: {
-              radiusKm: 50,
+              radiusKm: 16,
               windowDays: 14,
               targets: {
                 lifer: [
@@ -78,6 +78,41 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
                 ],
                 photo: [],
                 audio: [],
+              },
+              targetOrders: {
+                distance: {
+                  lifer: [
+                    {
+                      speciesCode: 'ruff',
+                      commonName: 'Ruff',
+                      observedAt: now,
+                      locality: 'Bay shore',
+                      distanceKm: 2.4,
+                    },
+                  ],
+                  photo: [],
+                  audio: [],
+                },
+                recent: {
+                  lifer: [
+                    {
+                      speciesCode: 'towwar',
+                      commonName: "Townsend's Warbler",
+                      observedAt: '2026-09-08T05:30:00.000Z',
+                      locality: 'Oak grove',
+                      distanceKm: 7.1,
+                    },
+                    {
+                      speciesCode: 'ruff',
+                      commonName: 'Ruff',
+                      observedAt: now,
+                      locality: 'Bay shore',
+                      distanceKm: 2.4,
+                    },
+                  ],
+                  photo: [],
+                  audio: [],
+                },
               },
               targetAvailability: { lifer: true, photo: true, audio: true },
               month: {
@@ -143,11 +178,44 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
             meta,
           },
         },
+        tide: {
+          status: 'ready' as const,
+          message: null as string | null,
+          refreshStatus: 'idle' as 'idle' | 'refreshing' | 'failed',
+          data: {
+            schemaVersion: 1 as const,
+            data: {
+              station: { label: 'Alameda', datum: 'MLLW' as const, units: 'feet' as const },
+              current: {
+                at: now,
+                heightFeet: 2.1,
+                basis: 'observed' as const,
+                direction: 'rising' as const,
+              },
+              nextTurn: {
+                kind: 'high' as const,
+                at: '2026-09-08T10:42:00.000Z',
+                heightFeet: 5.4,
+              },
+              predictions: [
+                { at: '2026-09-08T00:00:00.000Z', heightFeet: 0.5 },
+                { at: now, heightFeet: 2.1 },
+                { at: '2026-09-08T10:42:00.000Z', heightFeet: 5.4 },
+                { at: '2026-09-09T00:00:00.000Z', heightFeet: 1.2 },
+              ],
+              turns: [
+                { kind: 'low' as const, at: '2026-09-08T03:00:00.000Z', heightFeet: 0.5 },
+                { kind: 'high' as const, at: '2026-09-08T10:42:00.000Z', heightFeet: 5.4 },
+              ],
+            },
+            meta,
+          },
+        },
       },
       selector: { kind: 'current' as const, latitude: 37, longitude: -122, capturedAt: now },
       isRefreshing: false,
-      refreshProgress: 4,
-      visibleSourceCount: 4,
+      refreshProgress: 5,
+      visibleSourceCount: 5,
       isLocating: false,
       locationMessage: 'Using this device’s current location.',
       retryLocation: vi.fn(async () => undefined),
@@ -168,8 +236,8 @@ beforeEach(() => {
   localStorage.clear()
   document.documentElement.dataset.appearance = ''
   dashboard.isRefreshing = false
-  dashboard.refreshProgress = 4
-  dashboard.visibleSourceCount = 4
+  dashboard.refreshProgress = 5
+  dashboard.visibleSourceCount = 5
   moonPhase.label = 'Waxing gibbous'
   Object.values(dashboard.data).forEach((widget) => {
     widget.refreshStatus = 'idle'
@@ -360,7 +428,7 @@ describe('one store with two renderers', () => {
         '/launch/llmdash',
       )
       expect(screen.getByText('1.5 mi')).toBeVisible()
-      expect(screen.getByText(/within 31 mi · closest first/i)).toBeVisible()
+      expect(screen.getByText(/within 10 mi/i)).toBeVisible()
     }
 
     expectLaunches()
@@ -369,6 +437,59 @@ describe('one store with two renderers', () => {
     await closeSettings(user)
     expectLaunches()
     expect(screen.queryByText(/\bkm\b/i)).not.toBeInTheDocument()
+  })
+
+  it('switches one persisted target order across categories and renderers without a request', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const nearest = screen.getByRole('radio', { name: 'Nearest' })
+    const recent = screen.getByRole('radio', { name: 'Recent' })
+    expect(nearest).toBeChecked()
+    expect(screen.getByText('Ruff')).toBeVisible()
+    expect(screen.queryByText("Townsend's Warbler")).not.toBeInTheDocument()
+
+    await user.click(recent)
+
+    expect(recent).toBeChecked()
+    expect(recent).toHaveFocus()
+    expect(screen.getByText("Townsend's Warbler")).toBeVisible()
+    expect(screen.getByText('Recent targets selected.')).toBeVisible()
+    expect(JSON.parse(localStorage.getItem('homedash.preferences.v1') ?? '{}')).toMatchObject({
+      mode: 'dawn',
+      appearance: 'system',
+      targetSort: 'recent',
+    })
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('radio', { name: /Lifers/ }))
+    await openSettings(user)
+    await user.click(screen.getByRole('radio', { name: 'Dense' }))
+    await closeSettings(user)
+
+    expect(screen.getByRole('radio', { name: 'Recent' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Lifers/ })).toBeChecked()
+    expect(screen.getByText("Townsend's Warbler")).toBeVisible()
+  })
+
+  it('keeps a target order active and announces when storage refuses it', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = () => {
+      throw new DOMException('Storage disabled', 'SecurityError')
+    }
+    try {
+      await user.click(screen.getByRole('radio', { name: 'Recent' }))
+    } finally {
+      Storage.prototype.setItem = original
+    }
+
+    expect(screen.getByRole('radio', { name: 'Recent' })).toBeChecked()
+    expect(screen.getByText("Townsend's Warbler")).toBeVisible()
+    expect(
+      screen.getByText('Recent targets selected. This browser could not retain the choice.'),
+    ).toBeVisible()
   })
 
   it('shows the same source freshness and aggregate progress in Dawn and Dense', async () => {
@@ -382,9 +503,9 @@ describe('one store with two renderers', () => {
 
     expect(
       screen.getByRole('button', {
-        name: 'Refreshing 2 of 4 sources; saved readings remain visible',
+        name: 'Refreshing 2 of 5 sources; saved readings remain visible',
       }),
-    ).toHaveTextContent('Refreshing 2/4')
+    ).toHaveTextContent('Refreshing 2/5')
     expect(screen.getAllByRole('status', { name: /Refreshing/ })).toHaveLength(2)
 
     await openSettings(user)
@@ -426,7 +547,9 @@ describe('one store with two renderers', () => {
     render(<App />)
 
     await user.click(
-      screen.getByRole('button', { name: 'Refresh weather, bookmarks, eBird, and llmdash data' }),
+      screen.getByRole('button', {
+        name: 'Refresh weather, tide, bookmarks, eBird, and llmdash data',
+      }),
     )
     await waitFor(() => expect(dashboard.refreshAll).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(moonPhase.reevaluate).toHaveBeenCalledTimes(1))

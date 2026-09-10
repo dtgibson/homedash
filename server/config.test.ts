@@ -24,3 +24,42 @@ describe('bookmark document origin configuration', () => {
     )
   })
 })
+
+describe('eBird radius configuration', () => {
+  it('defaults standard installations to the ten-mile-equivalent radius', () => {
+    expect(loadConfig({}).ebirdRadiusKm).toBe(16)
+  })
+
+  it('keeps a valid custom host radius authoritative', () => {
+    expect(loadConfig({ EBIRD_RADIUS_KM: '23' }).ebirdRadiusKm).toBe(23)
+  })
+})
+
+describe('private tide station configuration', () => {
+  it('keeps a missing station nonfatal and defaults a configured station label', () => {
+    expect(loadConfig({}).tide).toEqual({ status: 'unavailable', reason: 'missing-station' })
+    expect(loadConfig({ TIDE_STATION_ID: ' 9414290 ' }).tide).toEqual({
+      status: 'ready',
+      stationId: '9414290',
+      stationLabel: 'Local tide',
+    })
+  })
+
+  it('accepts a trimmed private station label without changing the station ID', () => {
+    expect(
+      loadConfig({ TIDE_STATION_ID: '9414290', TIDE_STATION_LABEL: ' Alameda ' }).tide,
+    ).toEqual({
+      status: 'ready',
+      stationId: '9414290',
+      stationLabel: 'Alameda',
+    })
+  })
+
+  it.each([
+    [{ TIDE_STATION_ID: '../9414290' }, 'invalid-station'],
+    [{ TIDE_STATION_ID: '9414290', TIDE_STATION_LABEL: 'unsafe\nlabel' }, 'invalid-label'],
+    [{ TIDE_STATION_ID: '9414290', TIDE_STATION_LABEL: 'x'.repeat(101) }, 'invalid-label'],
+  ])('isolates invalid tide settings as unavailable: %j', (source, reason) => {
+    expect(loadConfig(source).tide).toEqual({ status: 'unavailable', reason })
+  })
+})

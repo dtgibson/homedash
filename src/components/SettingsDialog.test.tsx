@@ -131,6 +131,7 @@ function Harness({ onSaved = () => true, onAnnounce = () => undefined }: Harness
     schemaVersion: 1,
     mode: 'dawn',
     appearance: 'system',
+    targetSort: 'distance',
   })
   const triggerRef = useRef<HTMLButtonElement>(null)
   return (

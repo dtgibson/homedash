@@ -75,9 +75,18 @@ export default function App() {
             data={dashboard.data}
             moonPhase={moonPhase.label}
             category={category}
+            targetSort={preferences.targetSort}
             onCategory={(next) => {
               setCategory(next)
-              announce(`${next} targets selected · closest first.`)
+              announce(
+                `${next === 'lifer' ? 'Lifer' : next[0].toUpperCase() + next.slice(1)} targets selected.`,
+              )
+            }}
+            onTargetSort={(targetSort) => {
+              const retained = setPreferences({ ...preferences, targetSort })
+              announce(
+                `${targetSort === 'distance' ? 'Nearest' : 'Recent'} targets selected.${retained ? '' : ' This browser could not retain the choice.'}`,
+              )
             }}
             onRetry={retrySource}
           />
@@ -86,9 +95,18 @@ export default function App() {
             data={dashboard.data}
             moonPhase={moonPhase.label}
             category={category}
+            targetSort={preferences.targetSort}
             onCategory={(next) => {
               setCategory(next)
-              announce(`${next} targets selected · closest first.`)
+              announce(
+                `${next === 'lifer' ? 'Lifer' : next[0].toUpperCase() + next.slice(1)} targets selected.`,
+              )
+            }}
+            onTargetSort={(targetSort) => {
+              const retained = setPreferences({ ...preferences, targetSort })
+              announce(
+                `${targetSort === 'distance' ? 'Nearest' : 'Recent'} targets selected.${retained ? '' : ' This browser could not retain the choice.'}`,
+              )
             }}
             onRetry={retrySource}
           />

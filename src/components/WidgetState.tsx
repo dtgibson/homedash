@@ -8,6 +8,7 @@ const sourceLabels: Record<WidgetName, string> = {
   bookmarks: 'bookmarks',
   ebird: 'eBird',
   llmdash: 'llmdash',
+  tide: 'tide',
 }
 
 export function LoadingState({ message }: { message: string }) {

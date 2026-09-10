@@ -87,8 +87,10 @@ body {
   color: var(--ink);
   outline: 0;
   background: transparent;
+  box-shadow: inset 0 0 0 transparent;
   font-family: var(--body);
   font-size: 11px;
+  transition: box-shadow 160ms ease;
 }
 
 .kagi-form input::placeholder {
@@ -97,8 +99,8 @@ body {
 }
 
 .kagi-form input:focus-visible {
-  outline: 2px solid var(--gold-bright);
-  outline-offset: 3px;
+  outline: 0;
+  box-shadow: inset 0 -2px 0 var(--gold-bright);
 }
 
 .kagi-form button {
@@ -890,6 +892,18 @@ a.target-item:hover strong {
 }
 
 @media (max-width: 680px) {
+  .status-line {
+    top: calc(106px + env(safe-area-inset-top, 0px));
+    right: 10px;
+    bottom: auto;
+    max-width: min(280px, calc(100vw - 20px));
+    transform: translateY(-10px);
+  }
+
+  .status-line.is-visible {
+    transform: translateY(0);
+  }
+
   .shell {
     grid-template-rows: 100px minmax(0, 1fr);
   }
@@ -1139,13 +1153,23 @@ a.target-item:hover strong {
   }
 
   .bird-story {
+    display: grid;
+    grid-template-rows: auto auto auto 10px 44px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: 2px 0;
     border-bottom: 1px solid var(--line-strong);
     border-left: 0;
   }
 
   .bird-story .story-heading {
+    grid-row: 1;
+    grid-column: 1 / -1;
     margin-bottom: 0;
+  }
+
+  .bird-story > .source-freshness {
+    grid-row: 2;
+    grid-column: 1 / -1;
   }
 
   .bird-story .story-heading .state-badge {
@@ -1153,6 +1177,8 @@ a.target-item:hover strong {
   }
 
   .month-comparison {
+    grid-row: 3;
+    grid-column: 1 / -1;
     grid-template-columns: 1fr auto;
     align-items: center;
     height: 38px;
@@ -1193,7 +1219,13 @@ a.target-item:hover strong {
     margin: 0 0 0 5px;
   }
 
-  .bird-story > .section-kicker {
+  .bird-story .target-context {
+    display: contents;
+  }
+
+  .bird-story .target-context > .section-kicker {
+    grid-row: 4;
+    grid-column: 1 / -1;
     max-width: 100%;
     overflow: hidden;
     font-size: 6px;
@@ -1202,11 +1234,43 @@ a.target-item:hover strong {
     white-space: nowrap;
   }
 
+  .target-order,
+  .target-order .target-order-options {
+    gap: 5px;
+  }
+
+  .bird-story .target-order {
+    grid-row: 5;
+    grid-column: 2;
+  }
+
+  .target-order,
+  .target-order .target-order-options button {
+    font-size: 6.5px;
+    letter-spacing: 0.04em;
+  }
+
+  .target-order .target-order-options button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .target-tabs,
   .dense-target-controls {
     justify-content: space-between;
     gap: 8px;
     margin: 1px 0;
+  }
+
+  .bird-story .target-tabs {
+    grid-row: 5;
+    grid-column: 1;
+  }
+
+  .bird-story .target-list,
+  .bird-story .empty-copy {
+    grid-row: 6;
+    grid-column: 1 / -1;
   }
 
   .target-tabs button,
@@ -1241,9 +1305,9 @@ a.target-item:hover strong {
   .utility-story {
     grid-column: auto;
     grid-template-rows: 1fr;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
     gap: 9px;
-    padding: 5px 0 0;
+    padding: 4px 0 0;
     border-top: 0;
     border-left: 0;
   }
@@ -1266,6 +1330,14 @@ a.target-item:hover strong {
 
   .utility-head {
     margin-bottom: 4px;
+  }
+
+  .bookmarks-head {
+    margin-bottom: 0;
+  }
+
+  .bookmarks-story > .source-freshness {
+    margin-bottom: 2px;
   }
 
   .utility-section h2 {
@@ -1323,10 +1395,19 @@ a.target-item:hover strong {
   .bookmark-columns {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2px 5px;
+    align-content: start;
   }
 
   .bookmark-scroll {
-    padding-block: 4px;
+    padding: 5px 5px max(5px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .dense-bookmarks > nav {
+    display: contents;
+  }
+
+  .dense-bookmarks .has-bookmarks h3 {
+    display: none;
   }
 
   .bookmark-group h3 {
@@ -1337,7 +1418,7 @@ a.target-item:hover strong {
 
   .bookmark-group a {
     gap: 5px;
-    min-width: 48px;
+    min-width: 60px;
     min-height: 48px;
     padding: 4px 2px;
     font-size: 8.5px;
@@ -1348,9 +1429,14 @@ a.target-item:hover strong {
     display: none;
   }
 
-  .bookmark-group:nth-child(3) {
-    grid-column: auto;
-    grid-row: auto;
+  .bookmark-mark {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+  }
+
+  .bookmark-name {
+    flex: 0 1 auto;
   }
 
   .loading-copy,
@@ -1382,7 +1468,7 @@ a.target-item:hover strong {
   }
 
   .dense-head {
-    height: 20px;
+    height: 14px;
     padding-bottom: 3px;
   }
 
@@ -1401,22 +1487,77 @@ a.target-item:hover strong {
 
   .dense-grid {
     grid-template-rows: 87px minmax(307px, 1fr) 86px 146px;
-    height: calc(100% - 20px);
+    height: calc(100% - 14px);
   }
 
   .dense-row {
+    position: relative;
     grid-template-columns: 1fr;
-    gap: 1px;
+    gap: 0;
     padding: 2px 0;
   }
 
   .dense-label {
-    padding: 0;
+    position: absolute;
+    top: 3px;
+    right: 0;
+    z-index: 1;
+    padding: 0 0 0 5px;
+    background: var(--ground);
     font-size: 7px;
   }
 
-  .dense-wrap {
+  .dense-content > .source-freshness {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    min-height: 12px;
+  }
+
+  .dense-ebird-row .dense-content {
+    display: grid;
+    grid-template-rows: auto auto 8px 44px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dense-ebird-row {
+    padding-block: 0;
+  }
+
+  .dense-wrap,
+  .dense-ebird-row .dense-wrap {
     gap: 4px 9px;
+  }
+
+  .dense-ebird-row .dense-wrap {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    line-height: 1;
+  }
+
+  .dense-target-context {
+    display: contents;
+    margin-top: 0;
+  }
+
+  .dense-target-context > .dense-faint {
+    grid-row: 3;
+    grid-column: 1 / -1;
+  }
+
+  .dense-target-order {
+    grid-row: 4;
+    grid-column: 2;
+  }
+
+  .dense-target-controls {
+    grid-row: 4;
+    grid-column: 1;
+  }
+
+  .dense-target-list,
+  .dense-ebird-row .empty-copy {
+    grid-row: 5;
+    grid-column: 1 / -1;
   }
 
   .dense-primary {
@@ -1502,28 +1643,21 @@ a.target-item:hover strong {
   }
 
   .dense-bookmarks {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2px 7px;
-  }
-
-  .dense-bookmarks nav:nth-child(3) {
-    grid-column: auto;
-    grid-row: auto;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    align-content: start;
   }
 
   .dense-bookmarks a {
-    gap: 5px;
-    min-width: 48px;
-    min-height: 48px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    min-width: 60px;
+    min-height: 58px;
     padding: 4px 2px;
     font-size: 7px;
     line-height: 1.1;
-  }
-
-  .dense-bookmarks h3 {
-    margin: 0;
-    padding-bottom: 1px;
-    font-size: 6px;
+    text-align: center;
   }
 
   .dense-label .source-launch {
@@ -2306,5 +2440,454 @@ a.target-item:hover strong {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+  }
+}
+
+/* One shared coastal-day reading: daylight above, the local tide below. */
+.coastal-day {
+  display: grid;
+  align-content: end;
+  min-width: 0;
+}
+
+.coastal-graphic {
+  min-width: 0;
+}
+
+.coastal-graphic > svg {
+  display: block;
+  width: 100%;
+  height: 58px;
+  overflow: visible;
+}
+
+.daylight-band {
+  fill: var(--gold-wash);
+}
+
+.coastal-sun-track,
+.coastal-sun-progress,
+.tide-line,
+.tide-placeholder {
+  fill: none;
+}
+
+.coastal-sun-track {
+  stroke: var(--line);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 7;
+}
+
+.coastal-sun-progress {
+  stroke: var(--gold);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  transition: stroke-dasharray 220ms ease;
+}
+
+.solar-rule {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+
+.sun-point {
+  fill: var(--gold-bright);
+}
+
+.tide-axis {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.tide-line {
+  stroke: var(--ink-soft);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: d 220ms ease;
+}
+
+.tide-placeholder {
+  stroke: var(--line);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 6;
+}
+
+.tide-now-rule {
+  stroke: var(--gold);
+  stroke-width: 1.2;
+}
+
+.tide-current-point {
+  fill: var(--gold-bright);
+  stroke: var(--surface);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    cx 220ms ease,
+    cy 220ms ease;
+}
+
+.tide-turn-point {
+  fill: var(--surface);
+  stroke: var(--gold-bright);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    cx 220ms ease,
+    cy 220ms ease;
+}
+
+.coastal-label {
+  fill: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.coastal-sun-times {
+  margin-top: 0;
+  font-size: 6.5px;
+}
+
+.tide-facts-full {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: baseline;
+  min-width: 0;
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 7px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.tide-facts-full strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tide-facts-full > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tide-next {
+  color: var(--gold);
+}
+
+.tide-station {
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+.tide-facts-compact,
+.mobile-tide-details {
+  display: none;
+}
+
+.coastal-day .moon-phase {
+  margin-top: 2px;
+}
+
+.tide-source-state {
+  min-width: 0;
+  min-height: 13px;
+  transition: opacity 160ms ease-out;
+}
+
+.coastal-day .source-freshness {
+  justify-content: flex-end;
+  min-height: 13px;
+  margin: 0;
+  padding: 1px 0 0;
+  border: 0;
+  font-size: 6.5px;
+}
+
+.coastal-day .freshness-icon {
+  width: 6px;
+  height: 6px;
+}
+
+.coastal-day .loading-copy,
+.coastal-day .error-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+  min-height: 13px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 6.5px;
+}
+
+.coastal-day .loading-copy > span {
+  display: none;
+}
+
+.coastal-day .loading-copy p,
+.coastal-day .error-copy p {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  line-height: 1.2;
+}
+
+.coastal-day .error-copy strong {
+  color: var(--danger);
+  font-family: var(--mono);
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.coastal-day .retry-link {
+  min-height: 0;
+  font-size: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.dense-tide-source {
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.dense-tide-source .tide-source-state {
+  min-height: 0;
+}
+
+.dense-tide-source .source-freshness {
+  margin: 0 0 3px;
+  padding-bottom: 3px;
+  font-size: 7px;
+}
+
+.dense-tide-source .loading-copy,
+.dense-tide-source .error-copy {
+  min-height: 24px;
+}
+
+.dense-tide-source .loading-copy > span {
+  display: none;
+}
+
+.dense-tide-source .loading-copy p,
+.dense-tide-source .error-copy p {
+  font-size: 8px;
+}
+
+.dense-tide-source .error-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dense-tide-source .error-copy strong {
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.dense-tide-source .retry-link {
+  min-height: 30px;
+  margin-left: auto;
+  font-size: 7px;
+}
+
+.dense-tide-line {
+  position: relative;
+  gap: 5px 12px;
+  padding-right: 136px;
+  font-size: 8px;
+}
+
+.dense-tide-next {
+  color: var(--gold);
+  font-weight: 500;
+}
+
+.dense-tide-trace {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 124px;
+  height: 22px;
+  overflow: visible;
+  transform: translateY(-50%);
+}
+
+.dense-tide-trace .tide-line {
+  stroke-width: 1.5;
+}
+
+.dense-tide-trace .tide-turn-point {
+  stroke-width: 1.25;
+}
+
+@media (max-width: 680px) {
+  .coastal-graphic > svg {
+    height: 24px;
+  }
+
+  .coastal-sun-times {
+    font-size: 5.5px;
+  }
+
+  .tide-facts-full {
+    display: none;
+  }
+
+  .tide-facts-compact {
+    display: flex;
+    justify-content: center;
+    gap: 3px;
+    margin: 1px 0 0;
+    color: var(--ink-soft);
+    font-family: var(--mono);
+    font-size: 5.5px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .tide-facts-compact strong {
+    color: var(--ink);
+  }
+
+  .coastal-day .moon-phase {
+    margin-top: 1px;
+  }
+
+  .coastal-day .source-freshness {
+    justify-content: center;
+    min-height: 9px;
+    padding: 0;
+    font-size: 5.5px;
+  }
+
+  .coastal-day .freshness-icon,
+  .coastal-day .freshness-age,
+  .coastal-day .freshness-separator,
+  .coastal-day .freshness-detail {
+    display: none;
+  }
+
+  .coastal-day .freshness-retry {
+    min-width: 0;
+    min-height: 18px;
+    margin: -5px 0;
+    font-size: 5.5px;
+  }
+
+  .coastal-day .loading-copy,
+  .coastal-day .error-copy {
+    justify-content: center;
+    min-height: 9px;
+    font-size: 5.5px;
+  }
+
+  .coastal-day .error-copy p {
+    display: none;
+  }
+
+  .mobile-tide-details {
+    display: grid;
+    grid-column: 2;
+    grid-row: 2;
+    gap: 2px;
+    min-width: 0;
+    margin: 0 0 3px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+    color: var(--ink-soft);
+    font-family: var(--mono);
+    font-size: 6px;
+    line-height: 1.2;
+  }
+
+  .mobile-tide-details .tide-facts-full {
+    display: flex;
+    gap: 5px 9px;
+    margin: 0;
+    font-size: inherit;
+  }
+
+  .mobile-tide-source {
+    color: var(--ink-faint);
+  }
+
+  .weather-story > .source-freshness {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .dawn-composition {
+    grid-template-rows: 125px minmax(257px, 1fr) 151px;
+  }
+
+  .dense-grid {
+    grid-template-rows: 106px minmax(288px, 1fr) 86px 146px;
+  }
+
+  .dense-tide-source {
+    margin-top: 2px;
+  }
+
+  .dense-tide-source .source-freshness {
+    min-height: 10px;
+    margin-bottom: 1px;
+    padding: 0;
+    border: 0;
+    font-size: 5.5px;
+  }
+
+  .dense-tide-source .tide-source-state[data-refresh-state='idle'],
+  .dense-tide-source .tide-source-state[data-refresh-state='refreshing'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .dense-tide-line {
+    gap: 2px 7px;
+    min-height: 17px;
+    padding-right: 84px;
+    font-size: 6px;
+  }
+
+  .dense-tide-line .dense-primary,
+  .dense-tide-line .dense-soft,
+  .dense-tide-line .dense-faint {
+    font-size: 6px;
+  }
+
+  .dense-tide-trace {
+    position: absolute;
+    width: 78px;
+    height: 14px;
+    transform: translateY(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coastal-sun-progress,
+  .tide-line,
+  .tide-current-point,
+  .tide-turn-point,
+  .tide-source-state {
+    transition-duration: 0.01ms !important;
   }
 }

@@ -9,6 +9,10 @@ const optionalCoordinate = z.preprocess(
 type LlmdashLaunchDestination =
   { status: 'ready'; url: URL } | { status: 'unavailable'; reason: 'missing' | 'invalid' }
 
+type TideConfig =
+  | { status: 'ready'; stationId: string; stationLabel: string }
+  | { status: 'unavailable'; reason: 'missing-station' | 'invalid-station' | 'invalid-label' }
+
 function parseAllowedOrigins(value: string | undefined, port: number) {
   const configured = value ?? `http://127.0.0.1:${port},http://127.0.0.1:5173`
   const origins = configured.split(',').map((entry) => entry.trim())
@@ -61,6 +65,22 @@ function parseLlmdashLaunchDestination(value: string | undefined): LlmdashLaunch
   }
 }
 
+function parseTideConfig(
+  stationValue: string | undefined,
+  labelValue: string | undefined,
+): TideConfig {
+  const stationId = stationValue?.trim() ?? ''
+  if (!stationId) return { status: 'unavailable', reason: 'missing-station' }
+  if (!/^[A-Za-z0-9]{1,16}$/.test(stationId)) {
+    return { status: 'unavailable', reason: 'invalid-station' }
+  }
+  const stationLabel = labelValue?.trim() || 'Local tide'
+  if ([...stationLabel].length > 100 || /[\p{Cc}\u2028\u2029]/u.test(stationLabel)) {
+    return { status: 'unavailable', reason: 'invalid-label' }
+  }
+  return { status: 'ready', stationId, stationLabel }
+}
+
 const envSchema = z
   .object({
     HOMEDASH_HOST: z.string().default('127.0.0.1'),
@@ -69,11 +89,13 @@ const envSchema = z
     SNOWRAVEN_URL: z.url().default('http://127.0.0.1:1620'),
     LLMDASH_URL: z.url().default('http://127.0.0.1:8787'),
     LLMDASH_LAUNCH_URL: z.string().optional(),
+    TIDE_STATION_ID: z.string().optional(),
+    TIDE_STATION_LABEL: z.string().optional(),
     HOME_LATITUDE: optionalCoordinate,
     HOME_LONGITUDE: optionalCoordinate,
     HOME_LABEL: z.string().min(1).max(100).default('Home'),
     WEATHER_UNIT: z.enum(['fahrenheit', 'celsius']).default('fahrenheit'),
-    EBIRD_RADIUS_KM: z.coerce.number().int().min(1).max(200).default(50),
+    EBIRD_RADIUS_KM: z.coerce.number().int().min(1).max(200).default(16),
     EBIRD_WINDOW_DAYS: z.coerce.number().int().min(1).max(30).default(14),
     EBIRD_TARGET_LIMIT: z.coerce.number().int().min(1).max(20).default(5),
     BOOKMARKS_PATH: z.string().default('./config/bookmarks.json'),
@@ -111,6 +133,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
     snowRavenUrl: value.SNOWRAVEN_URL.replace(/\/$/, ''),
     llmdashUrl: value.LLMDASH_URL.replace(/\/$/, ''),
     llmdashLaunch: parseLlmdashLaunchDestination(value.LLMDASH_LAUNCH_URL),
+    tide: parseTideConfig(value.TIDE_STATION_ID, value.TIDE_STATION_LABEL),
     home:
       value.HOME_LATITUDE == null || value.HOME_LONGITUDE == null
         ? null

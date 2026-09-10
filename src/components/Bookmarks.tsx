@@ -12,7 +12,20 @@ function groupBookmarks(bookmarks: Bookmark[], sections: string[]) {
   return [...groups.entries()]
 }
 
-export function BookmarkFavicon({ bookmarkId }: { bookmarkId: string }) {
+function bookmarkFallbackLabel(name: string) {
+  const parts =
+    name
+      .trim()
+      .match(/\p{Lu}?\p{Ll}+|\p{Lu}+(?!\p{Ll})|\p{N}+/gu)
+      ?.filter(Boolean) ?? []
+  const characters =
+    parts.length > 1
+      ? [Array.from(parts[0]!)[0], Array.from(parts[1]!)[0]]
+      : Array.from(parts[0] ?? name.trim()).slice(0, 2)
+  return Array.from(characters.filter(Boolean).join('').toUpperCase()).slice(0, 2).join('') || 'BM'
+}
+
+export function BookmarkFavicon({ bookmarkId, name }: { bookmarkId: string; name: string }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
   const safeBookmarkId = /^[a-f0-9]{16}$/.test(bookmarkId)
@@ -34,20 +47,7 @@ export function BookmarkFavicon({ bookmarkId }: { bookmarkId: string }) {
           }}
         />
       )}
-      {!loaded && (
-        <svg
-          className="bookmark-fallback"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M6 4h12v16l-6-4-6 4z" />
-        </svg>
-      )}
+      {!loaded && <span className="bookmark-fallback">{bookmarkFallbackLabel(name)}</span>}
     </span>
   )
 }
@@ -68,14 +68,19 @@ export function BookmarkGroups({
       <div className={dense ? 'dense-bookmarks' : 'bookmark-columns'}>
         {groups.map(([group, links]) => (
           <nav
-            className={dense ? undefined : 'bookmark-group'}
+            className={[
+              dense ? null : 'bookmark-group',
+              links.length ? 'has-bookmarks' : 'is-empty',
+            ]
+              .filter(Boolean)
+              .join(' ')}
             aria-label={`${group} bookmarks`}
             key={group}
           >
             <h3>{group}</h3>
             {links.map((bookmark) => (
               <a className="bookmark-link" href={bookmark.url} key={bookmark.id}>
-                <BookmarkFavicon bookmarkId={bookmark.id} />
+                <BookmarkFavicon bookmarkId={bookmark.id} name={bookmark.name} />
                 <span className="bookmark-name">{bookmark.name}</span>
                 {!dense && (
                   <span className="bookmark-arrow" aria-hidden="true">

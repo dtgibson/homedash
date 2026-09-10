@@ -145,12 +145,12 @@ export function Toolbar({
           aria-disabled={refreshing}
           aria-label={
             refreshing
-              ? `Refreshing ${refreshProgress} of 4 sources${visibleSourceCount ? '; saved readings remain visible' : ''}`
-              : 'Refresh weather, bookmarks, eBird, and llmdash data'
+              ? `Refreshing ${refreshProgress} of 5 sources${visibleSourceCount ? '; saved readings remain visible' : ''}`
+              : 'Refresh weather, tide, bookmarks, eBird, and llmdash data'
           }
         >
           <RefreshIcon />
-          <span>{refreshing ? `Refreshing ${refreshProgress}/4` : 'Refresh'}</span>
+          <span>{refreshing ? `Refreshing ${refreshProgress}/5` : 'Refresh'}</span>
         </button>
       </div>
     </header>

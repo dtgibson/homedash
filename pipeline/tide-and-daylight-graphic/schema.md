@@ -1,0 +1,217 @@
+# Schema — Tide and Daylight Graphic
+
+## Path
+
+Incremental (extending the existing normalized source model). Homedash already owns four independent source envelopes, browser last-good snapshots, private environment configuration, Fastify source services, and Dawn/Dense renderers over one client state. This feature adds a fifth stateless source and no database, ORM model, durable server record, or migration.
+
+## Current Schema State
+
+### Application and persistence boundaries
+
+| Owner | Cumulative durable state after this feature |
+|---|---|
+| Browser | `homedash.preferences.v1`, `homedash.location.v1`, and independently validated `homedash.cache.<source>.v1` snapshots for weather, bookmarks, eBird, llmdash, and tide. |
+| Host | Private `.env`, the authoritative bookmark document selected by `BOOKMARKS_PATH`, and the existing systemd/Tailscale installation state. Tide station configuration is private environment state. |
+| Fastify process | Independent weather, bookmark, eBird, llmdash, favicon, and tide caches plus last-good envelopes. Every cache is bounded and replaceable on restart. |
+| Upstream | Open-Meteo, SnowRaven/eBird, llmdash, eligible bookmark origins, and NOAA Tides & Currents remain authoritative for their own data. |
+
+Dawn and Dense consume one normalized dashboard state. Appearance and view preferences remain browser-local. The host remains loopback-bound and Tailscale remains the authenticated HTTPS boundary. Exact coordinates and private upstream configuration do not enter browser URLs, responses, or logs.
+
+The existing shared envelope remains version 1:
+
+```ts
+type WidgetEnvelope<T> = {
+  schemaVersion: 1
+  data: T
+  issues: ApiIssue[]
+  meta: {
+    generatedAt: string
+    sourceUpdatedAt: string | null
+    freshness: 'fresh' | 'stale' | 'partial'
+    location?: LocationProvenance
+  }
+}
+```
+
+Weather, bookmark, eBird, llmdash, preference, location, bookmark-document, favicon, launch, and moon-phase contracts remain as documented by the prior cumulative schema. Tide is additive and does not change their payloads or ownership.
+
+### Private tide configuration
+
+`server/config.ts` adds two environment values:
+
+```ts
+type TideConfig =
+  | { status: 'ready'; stationId: string; stationLabel: string }
+  | { status: 'unavailable'; reason: 'missing-station' }
+```
+
+- `TIDE_STATION_ID` is optional at process start, trimmed, and valid only when it contains 1–16 ASCII letters or digits. It is sent only from the server to the fixed NOAA API.
+- `TIDE_STATION_LABEL` is optional, trimmed, rejects control characters, and contains 1–100 Unicode code points. It defaults to `Local tide` when a station ID exists.
+- Missing or invalid station configuration does not prevent Homedash from starting. The tide endpoint returns its source-specific unavailable envelope; all other sources remain healthy.
+- No station ID, label, coordinate, provider URL, or datum is accepted from a browser request.
+
+The public installer may add empty private placeholders when these variables are absent, but it must preserve an existing `.env` and never commit a real station value.
+
+### Provider boundary
+
+The only tide provider origin is the code-owned constant:
+
+```text
+https://api.tidesandcurrents.noaa.gov/api/prod/datagetter
+```
+
+`TideService` builds query parameters itself. The station comes from `TideConfig`; product, datum, units, time zone, application name, date range, interval, and format are fixed allowlisted values. Requests use `datum=MLLW`, `units=english`, `time_zone=gmt`, `format=json`, and the configured `UPSTREAM_TIMEOUT_MS`.
+
+One load uses three bounded provider products:
+
+1. `water_level` for recent six-minute observations.
+2. `predictions` at the provider's six-minute interval for the curve.
+3. `predictions` with `interval=hilo` for authoritative high/low turns.
+
+The request window covers the current date minus one day through the current date plus two days in UTC. This deliberately over-fetches a bounded window so every browser time zone can select its local day and the next turn after a late-evening load without sending coordinates. Provider bodies are read with a 512 KiB cap before JSON parsing. Each parsed collection is capped at 1,000 points, ordered strictly by time, finite, and bounded to heights from -100 through 100 feet. Duplicate timestamps, invalid dates, impossible event ordering, provider error objects, HTML, redirects away from the fixed HTTPS origin, or excessive bodies fail closed.
+
+### Normalized tide contracts
+
+```ts
+const tidePointSchema = z.object({
+  at: z.iso.datetime(),
+  heightFeet: z.number().finite().min(-100).max(100),
+})
+
+const tideTurnSchema = z.object({
+  kind: z.enum(['high', 'low']),
+  at: z.iso.datetime(),
+  heightFeet: z.number().finite().min(-100).max(100),
+})
+
+const tideCurrentSchema = z.object({
+  at: z.iso.datetime(),
+  heightFeet: z.number().finite().min(-100).max(100),
+  basis: z.enum(['observed', 'predicted']),
+  direction: z.enum(['rising', 'falling', 'near-slack']),
+})
+
+const tideSummarySchema = z.object({
+  station: z.object({
+    label: z.string().min(1).max(100),
+    datum: z.literal('MLLW'),
+    units: z.literal('feet'),
+  }),
+  current: tideCurrentSchema,
+  nextTurn: tideTurnSchema,
+  predictions: z.array(tidePointSchema).min(2).max(600),
+  turns: z.array(tideTurnSchema).min(1).max(16),
+})
+
+type TideEnvelope = WidgetEnvelope<TideSummary>
+```
+
+`stationId` is intentionally absent from the browser contract. The human label and datum provide honest provenance without exposing private configuration. `predictions` is the validated, downsampled visual series. It retains the first and last point, every 30-minute sample, the bracketing points around now, and every high/low event; output is strictly chronological and never exceeds 600 points.
+
+### Current value and direction rules
+
+At load time `now` is captured once and injected in tests.
+
+1. Choose the newest observation with `at <= now` and age no greater than 60 minutes.
+2. When one exists, `current` uses its height, time, and `basis: observed`.
+3. Otherwise, find prediction points bracketing `now`, linearly interpolate the height, use `at: now`, and set `basis: predicted`.
+4. For observed direction, compare the current observation with the newest distinct earlier observation at least six minutes older and no more than 60 minutes older. For predicted direction, compare the bracketing prediction points.
+5. A height change of `>= 0.05` feet is `rising`; `<= -0.05` feet is `falling`; everything between is `near-slack`.
+6. `nextTurn` is the first validated provider high/low event strictly after `now`. If no such event exists inside the bounded response, normalization fails rather than inventing one.
+
+When observations fail but predictions and turns are valid, return a successful envelope with predicted `current`, `freshness: partial`, and one safe `upstream-unavailable` issue explaining that the current value is predicted. When prediction data or the next turn is unavailable, the load fails and follows last-good/error behavior because the graphic cannot meet its contract.
+
+### Same-origin tide endpoint
+
+```text
+POST /api/tide
+Content-Type: application/json
+Body: { "timeZone": "America/Los_Angeles" }
+```
+
+The body is strict and contains only a validated IANA time-zone name of 1–80 characters. The time zone selects the local-day slice returned to the browser; it does not choose the provider station or upstream query. The route rejects query strings, unsupported content types, unknown fields, oversized bodies, invalid time zones, and non-POST methods through the existing safe API error conventions.
+
+Successful responses are `TideEnvelope`, `Cache-Control: no-store`, with the existing security headers. Provider and configuration failures return the same safe source-envelope pattern as other widgets: no upstream URLs, station IDs, provider fragments, stack traces, coordinates, or raw values are reflected.
+
+`TideService.load(timeZone, force)` returns prediction points spanning the requested time zone's current local midnight through the following local midnight, plus the first following high/low turn if it falls later. The `turns` array includes every event inside that graph window and the first later event. Date slicing uses validated ISO instants and an IANA time zone; daylight-saving days may contain 23 or 25 hours and are not forced to 24.
+
+### Cache and refresh state
+
+The service keeps two process-only caches keyed by configured station:
+
+- Prediction/turn cache: successful normalized provider data, 60-minute TTL, maximum one entry for the configured station.
+- Observation cache: successful observations, 5-minute TTL, maximum one entry.
+
+`force=true` bypasses both TTLs but retains last-good values until a complete validated replacement exists. Concurrent identical loads share one in-flight promise per cache. A prediction failure uses the last-good `TideEnvelope` as stale when available; an observation-only failure can produce a partial predicted envelope. Cache keys contain the station ID only in process memory and never enter logs or responses.
+
+The client adds:
+
+```ts
+type WidgetName = 'weather' | 'bookmarks' | 'ebird' | 'llmdash' | 'tide'
+```
+
+and registers `homedash.cache.tide.v1` with `tideEnvelopeSchema`. Tide participates in the existing `loading | ready | error` outer state plus `idle | refreshing | fresh | failed` refresh state, with the envelope's `fresh | partial | stale` data freshness. Snapshot parsing is fail-closed; an invalid snapshot is removed and never displayed.
+
+Initial load requests tide concurrently with the existing sources using the browser IANA time zone. Global refresh includes five sources and reports progress from 0 through 5. `retryWidget('tide')` requests only tide. Location refresh does not reload tide because the station is fixed; weather and eBird retain their current location-owned behavior.
+
+### Renderer contract
+
+Both renderers receive the same `WidgetState<TideEnvelope>`.
+
+- Dawn's daylight region composes the existing solar arc, moon label, tide text, and one SVG tide plot. The curve uses `predictions`; a now/current marker uses `current`; turn markers use `turns`; sunrise/sunset markers use the weather envelope when present. Text names current height, basis, direction, next turn/time/height, station label, datum, and source freshness.
+- Dense adds the same text meaning to its weather/daylight scan row and a compact SVG trace from the same points. It does not make a second request or reduce semantic content.
+- Chart SVGs expose no essential content exclusively through geometry or color. One concise accessible summary is provided in text; decorative path details are `aria-hidden` to prevent duplicate output.
+- Tide error/loading/partial notes occupy a fixed, bounded slot inside daylight context. They never replace weather, solar, or moon output.
+- Both renderers select points against the same time domain, scale height from the visible prediction min/max with a nonzero padded range, and clamp markers inside the view box. Empty, constant, non-finite, or out-of-order series never reach rendering because the shared schema rejects them.
+
+### Cumulative route and source inventory
+
+After this feature the server retains health, static, weather, bookmarks, editable bookmark document, favicon, eBird, llmdash, and fixed launch routes, and adds only `POST /api/tide`. CORS remains disabled; CSP remains same-origin for browser connections; the Kagi form remains the only allowed external form action. No database tables, migration files, service workers, WebSockets, analytics, accounts, or scheduled background jobs are added.
+
+## Changes in This Feature
+
+### Added
+
+- Private fixed-station tide configuration with a safe unavailable state.
+- Fixed NOAA provider adapter for observations, six-minute predictions, and high/low turns.
+- Strict tide point, current, turn, summary, and envelope schemas.
+- Deterministic observed/predicted fallback, direction classification, next-turn selection, local-day slicing, and downsampling.
+- Independent bounded process caches, same-origin tide route, browser last-good snapshot, global refresh participation, and tide-only retry.
+- Shared Dawn/Dense tide state plus accessible full and compact SVG presentations inside existing daylight context.
+
+### Modified
+
+- `DashboardData` and `WidgetName` gain additive `tide` state.
+- Global refresh source count and accessible copy move from four to five.
+- The daylight presentation gains tide state without changing weather or moon ownership.
+- The installer preserves existing private configuration and adds tide placeholders only when missing.
+
+### Unchanged
+
+- No existing envelope version, preference key, location key, weather contract, daylight calculation, moon-phase calculation, eBird contract, bookmark contract, llmdash contract, or persisted document changes.
+- No browser coordinate is sent to NOAA and no browser value chooses a station or provider destination.
+- No database, ORM, account, public listener, authentication layer, analytics, or production access by Codex is introduced.
+
+## Migration Plan
+
+1. Add tide configuration parsing and tests, keeping a missing station nonfatal and private.
+2. Add shared tide schemas and deterministic normalization helpers with fixtures for observed, predicted, partial, malformed, out-of-order, boundary, and daylight-saving cases.
+3. Implement the fixed-origin provider adapter, size/time bounds, independent caches, in-flight coalescing, and last-good behavior.
+4. Register `POST /api/tide` with strict time-zone validation and safe errors.
+5. Add tide to the client source registry, snapshot hydration, retry/global-refresh orchestration, progress copy, and request mocks.
+6. Implement the approved Dawn and Dense presentations over one normalized state; preserve weather, solar, and moon output in every tide state.
+7. Update private installer configuration handling and operational guidance without committing a real station.
+8. Run focused service, contract, hook, component, accessibility, viewport, typecheck, and production-build checks before the Spool checkpoint.
+
+Rollback is additive: remove the tide route, client registration, presentation, and optional environment parsing. Existing `.env` keys can remain ignored, and all prior snapshots, source contracts, and durable bookmark data remain readable because none changed.
+
+## Design Decisions
+
+1. **A fixed private station is the authority.** Tide is station-specific; server configuration avoids location leakage and prevents browser-controlled upstream requests.
+2. **NOAA remains authoritative.** Homedash normalizes provider observations and predictions but does not invent tidal science or store a competing history.
+3. **Observed and predicted are explicit.** A predicted fallback keeps the day useful, but its label prevents false precision.
+4. **Three provider products are worth the boundary.** Observations answer now, dense predictions draw the curve, and authoritative high/low predictions answer the next turn without fragile extrema inference.
+5. **Tide is independent in data and combined in presentation.** Failure isolation follows Homedash's source rules; visual placement follows the user's one-glance goal.
+6. **No schema migration is needed.** All new state is bounded cache or browser last-good data, not durable product data.
+7. **Text owns meaning.** SVG makes the day's shape faster to read, while labeled values preserve accessibility and honest failure behavior.
+8. **Local-day shape respects time zones.** The browser supplies only an IANA time zone; the fixed station and provider destination remain server-owned.

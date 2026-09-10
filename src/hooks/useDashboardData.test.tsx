@@ -66,9 +66,13 @@ function envelopes({
     ebird: {
       schemaVersion: 1 as const,
       data: {
-        radiusKm: 50,
+        radiusKm: 16,
         windowDays: 14,
         targets: { lifer: [], photo: [], audio: [] },
+        targetOrders: {
+          distance: { lifer: [], photo: [], audio: [] },
+          recent: { lifer: [], photo: [], audio: [] },
+        },
         targetAvailability: { lifer: true, photo: true, audio: true },
         month: {
           label: 'September',
@@ -112,6 +116,28 @@ function envelopes({
       },
       meta,
     },
+    tide: {
+      schemaVersion: 1 as const,
+      data: {
+        station: { label: 'Alameda', datum: 'MLLW' as const, units: 'feet' as const },
+        current: {
+          at: capturedAt,
+          heightFeet: 2.1,
+          basis: 'observed' as const,
+          direction: 'rising' as const,
+        },
+        nextTurn: { kind: 'high' as const, at: '2026-09-09T16:00:00.000Z', heightFeet: 5.4 },
+        predictions: [
+          { at: '2026-09-09T08:00:00.000Z', heightFeet: 0.8 },
+          { at: '2026-09-09T16:00:00.000Z', heightFeet: 5.4 },
+        ],
+        turns: [
+          { kind: 'low' as const, at: '2026-09-09T08:00:00.000Z', heightFeet: 0.8 },
+          { kind: 'high' as const, at: '2026-09-09T16:00:00.000Z', heightFeet: 5.4 },
+        ],
+      },
+      meta,
+    },
   }
 }
 
@@ -120,6 +146,7 @@ const paths = {
   '/api/bookmarks': 'bookmarks',
   '/api/ebird/summary': 'ebird',
   '/api/llmdash/summary': 'llmdash',
+  '/api/tide': 'tide',
 } as const
 
 function pathFor(input: RequestInfo | URL) {
@@ -149,6 +176,7 @@ function seedSnapshots(values: ReturnType<typeof envelopes>) {
   localStorage.setItem('homedash.cache.bookmarks.v1', JSON.stringify(values.bookmarks))
   localStorage.setItem('homedash.cache.ebird.v1', JSON.stringify(values.ebird))
   localStorage.setItem('homedash.cache.llmdash.v1', JSON.stringify(values.llmdash))
+  localStorage.setItem('homedash.cache.tide.v1', JSON.stringify(values.tide))
 }
 
 beforeEach(() => {
@@ -198,7 +226,7 @@ describe('cached dashboard refresh lifecycle', () => {
     })
   })
 
-  it('hydrates all four validated snapshots, settles independently, and preserves a failed source', async () => {
+  it('hydrates all five validated snapshots, settles independently, and preserves a failed source', async () => {
     const saved = envelopes({
       temperature: 41,
       bookmark: 'Saved bookmark',
@@ -221,7 +249,7 @@ describe('cached dashboard refresh lifecycle', () => {
 
     const { result } = renderHook(() => useDashboardData())
 
-    expect(result.current.visibleSourceCount).toBe(4)
+    expect(result.current.visibleSourceCount).toBe(5)
     expect(result.current.refreshProgress).toBe(0)
     expect(result.current.data.weather).toMatchObject({
       status: 'ready',
@@ -244,7 +272,13 @@ describe('cached dashboard refresh lifecycle', () => {
       expect(result.current.data.llmdash.data.data.providers[0].fiveHour?.remainingPct).toBe(9)
     }
 
-    await waitFor(() => expect(pending.size).toBe(4))
+    expect(result.current.data.tide).toMatchObject({
+      status: 'ready',
+      refreshStatus: 'refreshing',
+      data: { data: { current: { heightFeet: 2.1 } } },
+    })
+
+    await waitFor(() => expect(pending.size).toBe(5))
 
     await act(async () => {
       pending.get('/api/bookmarks')?.resolve(response(fresh.bookmarks))
@@ -279,6 +313,7 @@ describe('cached dashboard refresh lifecycle', () => {
     await act(async () => {
       pending.get('/api/weather')?.resolve(response(fresh.weather))
       pending.get('/api/ebird/summary')?.resolve(response(fresh.ebird))
+      pending.get('/api/tide')?.resolve(response(fresh.tide))
     })
     await waitFor(() => expect(result.current.isRefreshing).toBe(false))
     expect(result.current.data.weather).toMatchObject({
@@ -313,6 +348,22 @@ describe('cached dashboard refresh lifecycle', () => {
       refreshStatus: 'refreshing',
     })
     expect(result.current.data.llmdash.status).toBe('loading')
+    expect(result.current.data.tide.status).toBe('loading')
+  })
+
+  it('ignores a legacy eBird snapshot that cannot provide both complete orders', () => {
+    const saved = envelopes().ebird
+    const legacyData: Record<string, unknown> = { ...saved.data }
+    delete legacyData.targetOrders
+    localStorage.setItem('homedash.cache.ebird.v1', JSON.stringify({ ...saved, data: legacyData }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    )
+
+    const { result } = renderHook(() => useDashboardData())
+
+    expect(result.current.data.ebird.status).toBe('loading')
   })
 
   it('keeps every last-good value visible during a manual refresh batch', async () => {
@@ -343,7 +394,7 @@ describe('cached dashboard refresh lifecycle', () => {
     act(() => {
       refresh = result.current.refreshAll()
     })
-    await waitFor(() => expect(pending.size).toBe(4))
+    await waitFor(() => expect(pending.size).toBe(5))
 
     expect(result.current.refreshProgress).toBe(0)
     expect(result.current.data.weather).toMatchObject({
@@ -362,6 +413,7 @@ describe('cached dashboard refresh lifecycle', () => {
       pending.get('/api/weather')?.resolve(response(updated.weather))
       pending.get('/api/ebird/summary')?.resolve(response(updated.ebird))
       pending.get('/api/llmdash/summary')?.resolve(response(updated.llmdash))
+      pending.get('/api/tide')?.resolve(response(updated.tide))
       pending
         .get('/api/bookmarks')
         ?.resolve(response({ message: 'Bookmark configuration is unavailable.' }, 503))
@@ -397,6 +449,7 @@ describe('cached dashboard refresh lifecycle', () => {
     const weather = result.current.data.weather
     const ebird = result.current.data.ebird
     const llmdash = result.current.data.llmdash
+    const tide = result.current.data.tide
     const confirmed = {
       ...initial.bookmarks,
       data: {
@@ -418,6 +471,7 @@ describe('cached dashboard refresh lifecycle', () => {
     expect(result.current.data.weather).toBe(weather)
     expect(result.current.data.ebird).toBe(ebird)
     expect(result.current.data.llmdash).toBe(llmdash)
+    expect(result.current.data.tide).toBe(tide)
     expect(JSON.parse(localStorage.getItem('homedash.cache.bookmarks.v1') ?? 'null')).toEqual(
       confirmed,
     )
@@ -432,6 +486,31 @@ describe('cached dashboard refresh lifecycle', () => {
     })
     expect(result.current.data.bookmarks).toMatchObject({
       data: { data: { sections: ['Empty'] } },
+    })
+  })
+
+  it('retries only tide with a forced same-origin request', async () => {
+    const initial = envelopes()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const key = paths[pathFor(input) as keyof typeof paths]
+        return Promise.resolve(response(initial[key]))
+      }),
+    )
+    const { result } = renderHook(() => useDashboardData())
+    await waitFor(() => expect(result.current.isRefreshing).toBe(false))
+    vi.mocked(fetch).mockClear()
+
+    await act(async () => {
+      await result.current.retryWidget('tide')
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(pathFor(vi.mocked(fetch).mock.calls[0][0])).toBe('/api/tide')
+    expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({ 'x-homedash-refresh': '1' }),
     })
   })
 })

@@ -93,4 +93,6 @@ fi
 
 LLMDASH_URL="${LLMDASH_URL:-http://127.0.0.1:8787}" \
   LLMDASH_LAUNCH_URL="${LLMDASH_LAUNCH_URL:-}" \
+  TIDE_STATION_ID="${TIDE_STATION_ID:-}" \
+  TIDE_STATION_LABEL="${TIDE_STATION_LABEL:-Local tide}" \
   "$HOMEDASH_DIR/scripts/install-or-update.sh"

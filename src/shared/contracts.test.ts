@@ -3,7 +3,10 @@ import {
   bookmarkSchema,
   bookmarkUrlSchema,
   bookmarksEnvelopeSchema,
+  ebirdSummarySchema,
+  preferencesSchema,
   storedBookmarksEnvelopeSchema,
+  tideEnvelopeSchema,
 } from './contracts'
 
 const meta = {
@@ -39,6 +42,70 @@ function envelope(bookmarks: ReturnType<typeof bookmarkAt>[], sections?: string[
     meta,
   }
 }
+
+const ebirdTarget = {
+  speciesCode: 'ruff',
+  commonName: 'Ruff',
+  observedAt: '2026-09-10T08:00:00.000Z',
+  locality: 'Bay shore',
+  distanceKm: 2.4,
+}
+
+function ebirdSummary(targets = [ebirdTarget]) {
+  const targetSet = { lifer: targets, photo: [], audio: [] }
+  return {
+    radiusKm: 16,
+    windowDays: 14,
+    targets: targetSet,
+    targetOrders: { distance: targetSet, recent: targetSet },
+    targetAvailability: { lifer: true, photo: true, audio: true },
+    month: {
+      label: 'September',
+      throughDay: 10,
+      currentCount: 94,
+      previousCount: 87,
+      difference: 7,
+    },
+    nearbyUpdatedAt: '2026-09-10T08:00:00.000Z',
+    profileUpdatedAt: '2026-09-10T08:00:00.000Z',
+  }
+}
+
+describe('eBird order and browser preference contracts', () => {
+  it('requires both strict bounded target-order projections', () => {
+    expect(ebirdSummarySchema.safeParse(ebirdSummary()).success).toBe(true)
+    expect(
+      ebirdSummarySchema.safeParse({ ...ebirdSummary(), targetOrders: undefined }).success,
+    ).toBe(false)
+    expect(ebirdSummarySchema.safeParse(ebirdSummary(Array(6).fill(ebirdTarget))).success).toBe(
+      false,
+    )
+    const withUnknownCategory = ebirdSummary()
+    expect(
+      ebirdSummarySchema.safeParse({
+        ...withUnknownCategory,
+        targetOrders: {
+          ...withUnknownCategory.targetOrders,
+          recent: { ...withUnknownCategory.targetOrders.recent, rarity: [] },
+        },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('defaults only an absent or invalid target order while retaining valid display choices', () => {
+    expect(
+      preferencesSchema.parse({ schemaVersion: 1, mode: 'dense', appearance: 'dark' }),
+    ).toEqual({ schemaVersion: 1, mode: 'dense', appearance: 'dark', targetSort: 'distance' })
+    expect(
+      preferencesSchema.parse({
+        schemaVersion: 1,
+        mode: 'dense',
+        appearance: 'light',
+        targetSort: 'newest',
+      }),
+    ).toEqual({ schemaVersion: 1, mode: 'dense', appearance: 'light', targetSort: 'distance' })
+  })
+})
 
 describe('shared bookmark URL policy', () => {
   it.each([
@@ -169,5 +236,45 @@ describe('shared bookmark URL policy', () => {
       storedBookmarksEnvelopeSchema.safeParse(envelope([bookmarkAt(0, 'Daily', overLimit)]))
         .success,
     ).toBe(false)
+  })
+})
+
+describe('tide envelope contract', () => {
+  const tide = {
+    schemaVersion: 1,
+    data: {
+      station: { label: 'Alameda', datum: 'MLLW', units: 'feet' },
+      current: {
+        at: '2026-09-09T15:00:00.000Z',
+        heightFeet: 2.1,
+        basis: 'observed',
+        direction: 'rising',
+      },
+      nextTurn: { kind: 'high', at: '2026-09-09T17:42:00.000Z', heightFeet: 5.4 },
+      predictions: [
+        { at: '2026-09-09T07:00:00.000Z', heightFeet: 0.8 },
+        { at: '2026-09-09T17:42:00.000Z', heightFeet: 5.4 },
+      ],
+      turns: [{ kind: 'high', at: '2026-09-09T17:42:00.000Z', heightFeet: 5.4 }],
+    },
+    meta,
+  }
+
+  it('accepts finite normalized tide data without private station identifiers', () => {
+    expect(tideEnvelopeSchema.safeParse(tide).success).toBe(true)
+  })
+
+  it.each([
+    { ...tide, data: { ...tide.data, stationId: '9414290' } },
+    {
+      ...tide,
+      data: { ...tide.data, current: { ...tide.data.current, heightFeet: Number.NaN } },
+    },
+    {
+      ...tide,
+      data: { ...tide.data, predictions: [tide.data.predictions[0]] },
+    },
+  ])('rejects private, non-finite, or incomplete tide data', (candidate) => {
+    expect(tideEnvelopeSchema.safeParse(candidate).success).toBe(false)
   })
 })

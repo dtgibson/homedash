@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto'
+import { lookup } from 'node:dns/promises'
+import { BlockList, isIP, type LookupFunction } from 'node:net'
 import { inflateSync } from 'node:zlib'
+import { Agent, type Dispatcher } from 'undici'
 import type { Bookmark } from '../src/shared/contracts.js'
 import type { FetchLike } from './types.js'
 
@@ -45,6 +48,48 @@ interface QueuedPermit {
 
 const UNAVAILABLE: FaviconOutcome = { kind: 'unavailable' }
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
+const NON_PUBLIC_ADDRESSES = new BlockList()
+
+for (const [network, prefix] of [
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.0.0.0', 24],
+  ['192.0.2.0', 24],
+  ['192.31.196.0', 24],
+  ['192.88.99.0', 24],
+  ['192.168.0.0', 16],
+  ['192.175.48.0', 24],
+  ['198.18.0.0', 15],
+  ['198.51.100.0', 24],
+  ['203.0.113.0', 24],
+  ['224.0.0.0', 4],
+  ['240.0.0.0', 4],
+] as const) {
+  NON_PUBLIC_ADDRESSES.addSubnet(network, prefix, 'ipv4')
+}
+for (const [network, prefix] of [
+  ['::', 128],
+  ['::1', 128],
+  ['64:ff9b::', 96],
+  ['64:ff9b:1::', 48],
+  ['100::', 64],
+  ['2001::', 23],
+  ['2001:db8::', 32],
+  ['2002::', 16],
+  ['3fff::', 20],
+  ['5f00::', 16],
+  ['fc00::', 7],
+  ['fe80::', 10],
+  ['ff00::', 8],
+] as const) {
+  NON_PUBLIC_ADDRESSES.addSubnet(network, prefix, 'ipv6')
+}
+
+type NodeFetchInit = RequestInit & { dispatcher?: Dispatcher }
 
 export const FAVICON_BODY_LIMIT_BYTES = 131_072
 export const FAVICON_CACHE_MAX_ENTRIES = 128
@@ -736,7 +781,7 @@ function normalizedDeclaredMime(contentType: string | null): FaviconMime | 'gene
   const mime = contentType.split(';', 1)[0]!.trim().toLowerCase()
   if (mime === 'application/octet-stream' || mime === 'binary/octet-stream') return 'generic'
   if (['image/x-icon', 'image/vnd.microsoft.icon', 'image/ico', 'image/icon'].includes(mime)) {
-    return 'image/x-icon'
+    return 'generic'
   }
   if (mime === 'image/png') return 'image/png'
   if (mime === 'image/jpeg' || mime === 'image/jpg') return 'image/jpeg'
@@ -818,6 +863,52 @@ function sameOrigin(candidate: URL, initial: URL) {
   )
 }
 
+export function isPublicFaviconAddress(address: string) {
+  const family = isIP(address)
+  return (
+    (family === 4 && !NON_PUBLIC_ADDRESSES.check(address, 'ipv4')) ||
+    (family === 6 && !NON_PUBLIC_ADDRESSES.check(address, 'ipv6'))
+  )
+}
+
+function publicRedirectHostname(hostname: string) {
+  const candidate =
+    hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
+  const family = isIP(candidate)
+  if (family) return isPublicFaviconAddress(candidate)
+  const lower = candidate.toLowerCase()
+  return (
+    lower.includes('.') &&
+    lower !== 'localhost' &&
+    !lower.endsWith('.localhost') &&
+    !lower.endsWith('.local') &&
+    !lower.endsWith('.internal')
+  )
+}
+
+const publicLookup: LookupFunction = (hostname, options, callback) => {
+  void lookup(hostname, { all: true, verbatim: true }).then(
+    (addresses) => {
+      if (!addresses.length || addresses.some(({ address }) => !isPublicFaviconAddress(address))) {
+        const error = new Error('favicon redirect address is not public') as NodeJS.ErrnoException
+        error.code = 'ENOTFOUND'
+        callback(error, '', 0)
+        return
+      }
+      if (options.all) {
+        callback(null, addresses)
+        return
+      }
+      const requestedFamily = Number(options.family) || 0
+      const selected =
+        addresses.find(({ family }) => requestedFamily === 0 || family === requestedFamily) ??
+        addresses[0]!
+      callback(null, selected.address, selected.family)
+    },
+    (cause: NodeJS.ErrnoException) => callback(cause, '', 0),
+  )
+}
+
 export interface FaviconResolverOptions {
   now?: () => number
   cacheMaxEntries?: number
@@ -836,6 +927,18 @@ export class FaviconResolver {
   private readonly deadlineMs: number
   private readonly positiveTtlMs: number
   private readonly negativeTtlMs: number
+  private readonly publicRedirects = new Agent({
+    connections: 4,
+    pipelining: 1,
+    maxOrigins: FAVICON_CACHE_MAX_ENTRIES,
+    maxResponseSize: FAVICON_BODY_LIMIT_BYTES,
+    connectTimeout: FAVICON_DEADLINE_MS,
+    headersTimeout: FAVICON_DEADLINE_MS,
+    bodyTimeout: FAVICON_DEADLINE_MS,
+    keepAliveTimeout: 1_000,
+    keepAliveMaxTimeout: 2_000,
+    connect: { lookup: publicLookup },
+  })
 
   constructor(
     private readonly fetchImpl: FetchLike = fetch,
@@ -903,6 +1006,10 @@ export class FaviconResolver {
     }
   }
 
+  async close() {
+    await this.publicRedirects.close()
+  }
+
   private async observeUntilDeadline(
     outcome: Promise<FaviconOutcome>,
     deadlineAtMs: number,
@@ -964,18 +1071,21 @@ export class FaviconResolver {
     }
 
     let target = initial
+    let redirectOrigin: string | null = null
     let redirects = 0
     while (!signal.aborted && this.now() < deadlineAtMs) {
       let response: Response
       try {
-        response = await this.fetchImpl(target, {
+        const init: NodeFetchInit = {
           method: 'GET',
           body: null,
           credentials: 'omit',
           redirect: 'manual',
           referrerPolicy: 'no-referrer',
           signal,
-        })
+        }
+        if (!sameOrigin(target, initial)) init.dispatcher = this.publicRedirects
+        response = await this.fetchImpl(target, init)
       } catch {
         return UNAVAILABLE
       }
@@ -992,7 +1102,21 @@ export class FaviconResolver {
         } catch {
           return UNAVAILABLE
         }
-        if (!sameOrigin(next, initial)) return UNAVAILABLE
+        if (!sameOrigin(next, initial)) {
+          if (
+            initial.protocol !== 'https:' ||
+            next.protocol !== 'https:' ||
+            next.username ||
+            next.password ||
+            next.port ||
+            next.hostname === initial.hostname ||
+            !publicRedirectHostname(next.hostname) ||
+            (redirectOrigin !== null && next.origin !== redirectOrigin)
+          ) {
+            return UNAVAILABLE
+          }
+          redirectOrigin = next.origin
+        }
         redirects += 1
         target = next
         continue

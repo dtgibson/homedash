@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Homedash · Kagi focus refinement</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ground: #f2eee4;
+        --ground-deep: #e8e1d2;
+        --surface: #f8f4ea;
+        --ink: #29261f;
+        --ink-soft: #5f5a4e;
+        --ink-faint: #817a6a;
+        --line: #cfc6b3;
+        --line-strong: #9f9581;
+        --gold: #a9610d;
+        --gold-bright: #c27712;
+        --gold-wash: rgba(169, 97, 13, 0.1);
+        --green-wash: rgba(47, 121, 89, 0.09);
+        --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+        --body: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+        --mono: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+      }
+
+      [data-theme='dark'] {
+        color-scheme: dark;
+        --ground: #1b1915;
+        --ground-deep: #12110f;
+        --surface: #24211b;
+        --ink: #f2ead9;
+        --ink-soft: #b9b09e;
+        --ink-faint: #898171;
+        --line: #3c372d;
+        --line-strong: #625a49;
+        --gold: #dfa044;
+        --gold-bright: #f1b55c;
+        --gold-wash: rgba(223, 160, 68, 0.11);
+        --green-wash: rgba(124, 189, 145, 0.09);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 20% 10%, var(--gold-wash), transparent 35%),
+          radial-gradient(circle at 85% 88%, var(--green-wash), transparent 32%),
+          linear-gradient(145deg, var(--ground), var(--ground-deep));
+        font-family: var(--body);
+      }
+
+      button, input { font: inherit; }
+
+      button:focus-visible {
+        outline: 2px solid var(--gold-bright);
+        outline-offset: 3px;
+      }
+
+      .page {
+        width: min(1080px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 56px 0 72px;
+      }
+
+      .eyebrow, .state, .kagi-label {
+        font-family: var(--mono);
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: var(--gold);
+        font-size: 10px;
+        letter-spacing: 0.15em;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 0;
+        font-family: var(--display);
+        font-size: clamp(42px, 7vw, 78px);
+        font-weight: 400;
+        letter-spacing: -0.045em;
+        line-height: 0.98;
+      }
+
+      .lede {
+        max-width: 650px;
+        margin: 20px 0 38px;
+        color: var(--ink-soft);
+        font-family: var(--display);
+        font-size: 19px;
+        line-height: 1.5;
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .sample {
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: color-mix(in srgb, var(--surface) 82%, transparent);
+      }
+
+      .sample-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      .sample h2 {
+        margin: 0;
+        font-family: var(--display);
+        font-size: 27px;
+        font-weight: 400;
+      }
+
+      .state {
+        color: var(--ink-faint);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 0;
+        padding: 6px 10px;
+        border-block: 1px solid var(--line);
+      }
+
+      .wordmark {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--ink-soft);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .mark {
+        width: 8px;
+        height: 8px;
+        border: 1px solid var(--gold);
+        transform: rotate(45deg);
+      }
+
+      .kagi-form {
+        display: flex;
+        align-items: stretch;
+        min-width: 0;
+        height: 36px;
+        flex: 1 1 320px;
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        background: color-mix(in srgb, var(--surface) 72%, transparent);
+        transition: border-color 160ms ease, background-color 160ms ease;
+      }
+
+      .kagi-form:focus-within {
+        border-color: var(--gold);
+        background: var(--surface);
+      }
+
+      .kagi-label {
+        display: inline-flex;
+        align-items: center;
+        padding-left: 10px;
+        color: color-mix(in srgb, var(--gold) 94%, var(--ink));
+        font-size: 8px;
+        letter-spacing: 0.08em;
+      }
+
+      .kagi-form input {
+        width: 100%;
+        min-width: 0;
+        padding: 0 8px;
+        border: 0;
+        color: var(--ink);
+        outline: 0;
+        background: transparent;
+        font-size: 11px;
+      }
+
+      .kagi-form input::placeholder { color: var(--ink-faint); opacity: 1; }
+
+      .current input.simulated-focus {
+        outline: 2px solid var(--gold-bright);
+        outline-offset: 3px;
+      }
+
+      .refined input {
+        box-shadow: inset 0 0 0 transparent;
+        transition: box-shadow 160ms ease;
+      }
+
+      .refined input:focus,
+      .refined input:focus-visible {
+        outline: 0;
+        box-shadow: inset 0 -2px 0 var(--gold-bright);
+      }
+
+      .kagi-form button {
+        width: 38px;
+        flex: none;
+        padding: 0;
+        border: 0;
+        border-left: 1px solid var(--line);
+        color: var(--gold);
+        background: transparent;
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+
+      .kagi-form button:hover { color: var(--ink); background: var(--gold-wash); }
+
+      .note {
+        min-height: 44px;
+        margin: 16px 0 0;
+        color: var(--ink-soft);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 22px;
+      }
+
+      .theme-button {
+        min-height: 42px;
+        padding: 0 14px;
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        color: var(--ink);
+        background: var(--surface);
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+
+      @media (max-width: 760px) {
+        .page { width: min(100% - 24px, 560px); padding-top: 34px; }
+        .comparison { grid-template-columns: 1fr; }
+        .sample { padding: 14px; }
+        .toolbar { flex-wrap: wrap; padding: 6px 0; }
+        .wordmark { display: none; }
+        .kagi-form { width: 100%; height: 44px; flex-basis: 100%; }
+        .kagi-form button { width: 44px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <p class="eyebrow">Existing surface · focused state</p>
+      <h1>Ready to type, without the box fighting the toolbar.</h1>
+      <p class="lede">The search stays active on load. The visible cue moves inside the editable field, preserving keyboard clarity while keeping Kagi and the surrounding chrome untouched.</p>
+
+      <section class="comparison" aria-label="Focus treatment comparison">
+        <article class="sample current">
+          <div class="sample-head"><h2>Today</h2><span class="state">Offset outline</span></div>
+          <div class="toolbar">
+            <span class="wordmark"><span class="mark" aria-hidden="true"></span>homedash</span>
+            <form class="kagi-form" role="search" aria-label="Current Kagi search" onsubmit="return false">
+              <label class="kagi-label" for="current-query">Kagi</label>
+              <input class="simulated-focus" id="current-query" type="search" placeholder="Search the web" aria-label="Current Kagi query" />
+              <button type="submit" aria-label="Search current example">→</button>
+            </form>
+          </div>
+          <p class="note">The input outline escapes its area and crosses the label-side boundary.</p>
+        </article>
+
+        <article class="sample refined">
+          <div class="sample-head"><h2>Refined</h2><span class="state">Contained focus</span></div>
+          <div class="toolbar">
+            <span class="wordmark"><span class="mark" aria-hidden="true"></span>homedash</span>
+            <form class="kagi-form" role="search" aria-label="Refined Kagi search" onsubmit="return false">
+              <label class="kagi-label" for="refined-query">Kagi</label>
+              <input id="refined-query" type="search" placeholder="Search the web" aria-label="Refined Kagi query" autocomplete="off" />
+              <button type="submit" aria-label="Search refined example">→</button>
+            </form>
+          </div>
+          <p class="note">The brighter lower rule identifies the focused input; the gold form border signals the active search without extra paint outside it.</p>
+        </article>
+      </section>
+
+      <div class="actions"><button class="theme-button" type="button" id="theme-toggle">Preview light appearance</button></div>
+    </main>
+    <script>
+      const root = document.documentElement
+      const input = document.querySelector('#refined-query')
+      const toggle = document.querySelector('#theme-toggle')
+      requestAnimationFrame(() => input?.focus({ preventScroll: true }))
+      toggle?.addEventListener('click', () => {
+        const next = root.dataset.theme === 'dark' ? 'light' : 'dark'
+        root.dataset.theme = next
+        toggle.textContent = next === 'dark' ? 'Preview light appearance' : 'Preview dark appearance'
+        input?.focus({ preventScroll: true })
+      })
+    </script>
+  </body>
+</html>

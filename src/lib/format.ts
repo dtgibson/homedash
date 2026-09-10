@@ -44,6 +44,10 @@ export function formatMiles(value: number) {
   return `${miles < 10 - 1e-9 ? miles.toFixed(1) : Math.round(miles)} mi`
 }
 
+export function formatRadiusMiles(value: number) {
+  return `${Math.round(kilometersToMiles(value))} mi`
+}
+
 export function formatDistance(value: number | null) {
   return value == null ? 'distance unknown' : formatMiles(value)
 }

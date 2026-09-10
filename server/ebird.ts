@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { parse } from 'csv-parse'
 import { z } from 'zod'
-import type { ApiIssue, EbirdEnvelope, EbirdTarget } from '../src/shared/contracts.js'
+import type { ApiIssue, EbirdEnvelope, EbirdTarget, TargetSort } from '../src/shared/contracts.js'
 import type { AppConfig } from './config.js'
 import { MemoryCache } from './cache.js'
 import { asSourceError, SourceError } from './errors.js'
@@ -52,8 +52,9 @@ export function classifyTargetCategories(
   targets: readonly SortableTarget[],
   profile: Pick<PersonalProfile, 'seen' | 'photo' | 'audio' | 'mediaAvailable'>,
   limit: number,
+  order: TargetSort = 'distance',
 ) {
-  const sorted = dedupeSortTargets(targets)
+  const sorted = dedupeSortTargets(targets, order)
   return {
     lifer: sorted.filter((target) => !profile.seen.has(target.speciesCode)).slice(0, limit),
     photo: profile.mediaAvailable
@@ -73,26 +74,55 @@ function observedEpoch(target: SortableTarget) {
 }
 
 /**
- * The product's load-bearing target rule. Canonical species are collapsed first;
- * a known shortest distance always beats an unknown one, and recency is consulted
- * only when distances are equal. The caller applies its display cap afterward.
+ * The product's load-bearing target rule. Canonical species are collapsed using
+ * the selected order before the caller applies its category filters and cap.
  */
-export function dedupeSortTargets(targets: readonly SortableTarget[]): SortableTarget[] {
+export function dedupeSortTargets(
+  targets: readonly SortableTarget[],
+  order: TargetSort = 'distance',
+): SortableTarget[] {
+  const compare = order === 'recent' ? compareRecentTargets : compareDistanceTargets
   const bySpecies = new Map<string, SortableTarget>()
   for (const target of targets) {
     const current = bySpecies.get(target.speciesCode)
-    if (!current || compareTargets(target, current) < 0) bySpecies.set(target.speciesCode, target)
+    if (!current || compare(target, current) < 0) bySpecies.set(target.speciesCode, target)
   }
-  return [...bySpecies.values()].sort(compareTargets)
+  return [...bySpecies.values()].sort(compare)
 }
 
-function compareTargets(a: SortableTarget, b: SortableTarget) {
-  const aDistance =
-    typeof a.distanceKm === 'number' && Number.isFinite(a.distanceKm) ? a.distanceKm : Infinity
-  const bDistance =
-    typeof b.distanceKm === 'number' && Number.isFinite(b.distanceKm) ? b.distanceKm : Infinity
+function knownDistance(target: SortableTarget) {
+  return typeof target.distanceKm === 'number' && Number.isFinite(target.distanceKm)
+    ? target.distanceKm
+    : Infinity
+}
+
+function compareCodePoint(a: string, b: string) {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+function compareStableFields(a: SortableTarget, b: SortableTarget) {
+  return (
+    compareCodePoint(a.speciesCode, b.speciesCode) ||
+    compareCodePoint(a.locality, b.locality) ||
+    compareCodePoint(a.commonName, b.commonName)
+  )
+}
+
+function compareDistanceTargets(a: SortableTarget, b: SortableTarget) {
+  const aDistance = knownDistance(a)
+  const bDistance = knownDistance(b)
   if (aDistance !== bDistance) return aDistance - bDistance
-  return observedEpoch(b) - observedEpoch(a)
+  const observed = observedEpoch(b) - observedEpoch(a)
+  return observed || compareStableFields(a, b)
+}
+
+function compareRecentTargets(a: SortableTarget, b: SortableTarget) {
+  const observed = observedEpoch(b) - observedEpoch(a)
+  if (observed) return observed
+  const aDistance = knownDistance(a)
+  const bDistance = knownDistance(b)
+  if (aDistance !== bDistance) return aDistance - bDistance
+  return compareStableFields(a, b)
 }
 
 export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -247,7 +277,8 @@ export class EbirdService {
         })
       }
 
-      const targets = classifyTargetCategories(nearby, profile, limit)
+      const distanceTargets = classifyTargetCategories(nearby, profile, limit, 'distance')
+      const recentTargets = classifyTargetCategories(nearby, profile, limit, 'recent')
       const stale = Date.now() - Date.parse(profile.updatedAt) > 6 * 60 * 60_000
       const generatedAt = new Date().toISOString()
       const envelope: EbirdEnvelope = {
@@ -255,7 +286,11 @@ export class EbirdService {
         data: {
           radiusKm: this.config.ebirdRadiusKm,
           windowDays: this.config.ebirdWindowDays,
-          targets,
+          targets: distanceTargets,
+          targetOrders: {
+            distance: distanceTargets,
+            recent: recentTargets,
+          },
           targetAvailability: {
             lifer: true,
             photo: profile.mediaAvailable,
