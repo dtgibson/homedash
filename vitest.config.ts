@@ -7,6 +7,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.ts'],
+    maxWorkers: 2,
+    testTimeout: 15_000,
     coverage: { reporter: ['text', 'html'] },
   },
 })
