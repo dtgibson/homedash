@@ -5,7 +5,8 @@ import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DawnProvider } from './Quota'
 import { TargetList, TargetTabs } from './Targets'
-import { DawnDaylight, DawnWeather, LocationProvenance } from './Weather'
+import { CoastalDay, DawnTideDetails } from './Tide'
+import { DawnWeather, LocationProvenance } from './Weather'
 import { ErrorState, LoadingState, SourceFreshness, StateBadge } from './WidgetState'
 
 function dayGreeting(date = new Date()) {
@@ -35,9 +36,10 @@ export function DawnView({ data, moonPhase, category, onCategory, onRetry }: Vie
   const ebird = data.ebird.status === 'ready' ? data.ebird.data : null
   const llmdash = data.llmdash.status === 'ready' ? data.llmdash.data : null
   const bookmarks = data.bookmarks.status === 'ready' ? data.bookmarks.data : null
+  const tide = data.tide.status === 'ready' ? data.tide.data : null
 
   const lede = weather
-    ? `${weather.data.condition} with a high of ${Math.round(weather.data.high)}°. ${ebird ? `${ebird.data.targets[category].length} ${category} targets are nearby.` : 'Birding data is still arriving.'}`
+    ? `${weather.data.condition} with a high of ${Math.round(weather.data.high)}°. ${tide ? `The water is ${tide.data.current.direction.replace('-', ' ')} toward a ${tide.data.nextTurn.kind}.` : ebird ? `${ebird.data.targets[category].length} ${category} targets are nearby.` : 'Birding data is still arriving.'}`
     : 'Your weather, birding opportunities, coding runway, and destinations in one place.'
 
   return (
@@ -48,7 +50,12 @@ export function DawnView({ data, moonPhase, category, onCategory, onRetry }: Vie
           <h1 id="dawn-title">{dayGreeting()}</h1>
           <p className="lede">{lede}</p>
         </div>
-        <DawnDaylight envelope={weather} moonPhase={moonPhase} />
+        <CoastalDay
+          weather={weather}
+          tide={data.tide}
+          moonPhase={moonPhase}
+          onRetry={() => onRetry('tide')}
+        />
       </header>
 
       <div className="dawn-composition">
@@ -76,6 +83,7 @@ export function DawnView({ data, moonPhase, category, onCategory, onRetry }: Vie
             )}
           </div>
           <SourceFreshness source="weather" state={data.weather} onRetry={onRetry} />
+          <DawnTideDetails state={data.tide} />
           {data.weather.status === 'loading' && (
             <LoadingState message="Asking Open-Meteo for the latest reading…" />
           )}

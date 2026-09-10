@@ -20,6 +20,7 @@ import { safeErrorBody, SourceError } from './errors.js'
 import { FAVICON_DEADLINE_MS, FaviconResolver } from './favicon.js'
 import { LlmdashService } from './llmdash.js'
 import { resolveLocation } from './location.js'
+import { TideService } from './tide.js'
 import type { FetchLike } from './types.js'
 import { WeatherService } from './weather.js'
 
@@ -27,6 +28,12 @@ const ebirdRequestSchema = z.object({
   location: locationSelectorSchema,
   timeZone: z.string().min(1).max(80),
 })
+
+const tideRequestSchema = z
+  .object({
+    timeZone: z.string().min(1).max(80),
+  })
+  .strict()
 
 const securityHeaders = {
   'content-security-policy':
@@ -65,6 +72,15 @@ function isFaviconNamespace(url: string | undefined) {
 function isBookmarkDocumentNamespace(url: string | undefined) {
   const pathOnly = (url ?? '').split('?', 1)[0].toLowerCase()
   return pathOnly.startsWith('/api/bookmarks/document')
+}
+
+function isTideNamespace(url: string | undefined) {
+  const pathOnly = (url ?? '').split('?', 1)[0].toLowerCase()
+  return pathOnly === '/api/tide'
+}
+
+function tideRequestError(message = 'The tide request is invalid.', statusCode = 400) {
+  return safeErrorBody(new SourceError('invalid-configuration', message, false, statusCode))
 }
 
 function bookmarkDocumentError(
@@ -208,6 +224,24 @@ export async function buildApp(options: BuildAppOptions) {
         frameworkReply.status(400).send(invalidLaunchRequest())
         return
       }
+      if (isTideNamespace(request.raw.url)) {
+        const tooLarge = error.code === 'FST_ERR_CTP_BODY_TOO_LARGE'
+        const unsupported = error.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE'
+        frameworkReply
+          .status(tooLarge ? 413 : unsupported ? 415 : 400)
+          .header('cache-control', 'no-store')
+          .send(
+            tideRequestError(
+              tooLarge
+                ? 'The tide request is too large.'
+                : unsupported
+                  ? 'Tide requests must use JSON.'
+                  : undefined,
+              tooLarge ? 413 : unsupported ? 415 : 400,
+            ),
+          )
+        return
+      }
       if (error.code === 'FST_ERR_BAD_URL' || error.code === 'FST_ERR_MAX_PARAM_LENGTH') {
         frameworkReply
           .status(error.statusCode ?? 400)
@@ -224,6 +258,7 @@ export async function buildApp(options: BuildAppOptions) {
   })
   const ebird = new EbirdService(options.config, options.fetchImpl)
   const llmdash = new LlmdashService(options.config, options.fetchImpl)
+  const tide = new TideService(options.config, options.fetchImpl)
 
   app.setErrorHandler((error, request, reply) => {
     if (isBookmarkDocumentNamespace(request.raw.url)) {
@@ -248,6 +283,9 @@ export async function buildApp(options: BuildAppOptions) {
           false,
         ),
       )
+    }
+    if (isTideNamespace(request.raw.url)) {
+      return reply.status(400).header('cache-control', 'no-store').send(tideRequestError())
     }
     return reply.send(error)
   })
@@ -345,6 +383,31 @@ export async function buildApp(options: BuildAppOptions) {
         !/^\/api\/bookmarks\/[a-f0-9]{16}\/favicon$/.test(rawPath))
     ) {
       return sendEmptyFavicon(reply, 'no-store')
+    }
+    if (isTideNamespace(rawUrl)) {
+      if (rawPath !== '/api/tide' || rawUrl.includes('?')) {
+        return reply.status(400).header('cache-control', 'no-store').send(tideRequestError())
+      }
+      if (request.method !== 'POST') {
+        reply.header('allow', 'POST')
+        return reply
+          .status(405)
+          .header('cache-control', 'no-store')
+          .send(tideRequestError('This tide request method is not supported.', 405))
+      }
+      const encoding = request.headers['content-encoding']?.trim().toLowerCase()
+      if (encoding && encoding !== 'identity') {
+        return reply
+          .status(415)
+          .header('cache-control', 'no-store')
+          .send(tideRequestError('Compressed tide requests are not supported.', 415))
+      }
+      if (!isJsonMediaType(request.headers['content-type'])) {
+        return reply
+          .status(415)
+          .header('cache-control', 'no-store')
+          .send(tideRequestError('Tide requests must use JSON.', 415))
+      }
     }
     const normalizedRawPath = rawPath.toLowerCase()
     if (
@@ -586,6 +649,26 @@ export async function buildApp(options: BuildAppOptions) {
           ? error
           : new SourceError('upstream-unavailable', 'llmdash could not be reached.')
       return reply.status(safe.statusCode).send(safeErrorBody(safe))
+    }
+  })
+
+  app.post('/api/tide', { bodyLimit: 512, exposeHeadRoute: false }, async (request, reply) => {
+    const parsed = tideRequestSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.status(400).header('cache-control', 'no-store').send(tideRequestError())
+    }
+    try {
+      const envelope = await tide.load(parsed.data.timeZone, forceRefresh(request.headers))
+      return reply.header('cache-control', 'no-store').send(envelope)
+    } catch (error) {
+      const safe =
+        error instanceof SourceError
+          ? error
+          : new SourceError('upstream-unavailable', 'Tide could not be reached.')
+      return reply
+        .status(safe.statusCode)
+        .header('cache-control', 'no-store')
+        .send(safeErrorBody(safe))
     }
   })
 

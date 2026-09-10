@@ -39,7 +39,7 @@ export const locationProvenanceSchema = z.object({
 export const apiMetaSchema = z.object({
   generatedAt: z.iso.datetime(),
   sourceUpdatedAt: z.iso.datetime().nullable(),
-  freshness: z.enum(['fresh', 'stale']),
+  freshness: z.enum(['fresh', 'partial', 'stale']),
   staleAfterMs: z.number().int().positive(),
   issues: z.array(apiIssueSchema),
   location: locationProvenanceSchema.optional(),
@@ -212,6 +212,46 @@ export const llmdashSummarySchema = z.object({
   generatedAt: z.iso.datetime(),
 })
 
+export const tidePointSchema = z
+  .object({
+    at: z.iso.datetime(),
+    heightFeet: z.number().finite().min(-100).max(100),
+  })
+  .strict()
+
+export const tideTurnSchema = z
+  .object({
+    kind: z.enum(['high', 'low']),
+    at: z.iso.datetime(),
+    heightFeet: z.number().finite().min(-100).max(100),
+  })
+  .strict()
+
+export const tideCurrentSchema = z
+  .object({
+    at: z.iso.datetime(),
+    heightFeet: z.number().finite().min(-100).max(100),
+    basis: z.enum(['observed', 'predicted']),
+    direction: z.enum(['rising', 'falling', 'near-slack']),
+  })
+  .strict()
+
+export const tideSummarySchema = z
+  .object({
+    station: z
+      .object({
+        label: z.string().min(1).max(100),
+        datum: z.literal('MLLW'),
+        units: z.literal('feet'),
+      })
+      .strict(),
+    current: tideCurrentSchema,
+    nextTurn: tideTurnSchema,
+    predictions: z.array(tidePointSchema).min(2).max(600),
+    turns: z.array(tideTurnSchema).min(1).max(16),
+  })
+  .strict()
+
 export const weatherEnvelopeSchema = widgetEnvelopeSchema(weatherSummarySchema)
 export const bookmarksEnvelopeSchema = widgetEnvelopeSchema(bookmarksSummarySchema)
 const legacyBookmarksEnvelopeSchema = widgetEnvelopeSchema(
@@ -236,6 +276,7 @@ export const storedBookmarksEnvelopeSchema = z.union([
 ])
 export const ebirdEnvelopeSchema = widgetEnvelopeSchema(ebirdSummarySchema)
 export const llmdashEnvelopeSchema = widgetEnvelopeSchema(llmdashSummarySchema)
+export const tideEnvelopeSchema = widgetEnvelopeSchema(tideSummarySchema)
 
 export const apiErrorSchema = z.object({
   schemaVersion: z.literal(1),
@@ -250,10 +291,14 @@ export type Bookmark = z.infer<typeof bookmarkSchema>
 export type EbirdTarget = z.infer<typeof ebirdTargetSchema>
 export type EbirdSummary = z.infer<typeof ebirdSummarySchema>
 export type LlmdashSummary = z.infer<typeof llmdashSummarySchema>
+export type TidePoint = z.infer<typeof tidePointSchema>
+export type TideTurn = z.infer<typeof tideTurnSchema>
+export type TideSummary = z.infer<typeof tideSummarySchema>
 export type WeatherEnvelope = z.infer<typeof weatherEnvelopeSchema>
 export type BookmarksEnvelope = z.infer<typeof bookmarksEnvelopeSchema>
 export type EbirdEnvelope = z.infer<typeof ebirdEnvelopeSchema>
 export type LlmdashEnvelope = z.infer<typeof llmdashEnvelopeSchema>
+export type TideEnvelope = z.infer<typeof tideEnvelopeSchema>
 
 export const replaceBookmarkDocumentRequestSchema = z
   .object({

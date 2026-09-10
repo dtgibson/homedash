@@ -4,6 +4,7 @@ import {
   bookmarkUrlSchema,
   bookmarksEnvelopeSchema,
   storedBookmarksEnvelopeSchema,
+  tideEnvelopeSchema,
 } from './contracts'
 
 const meta = {
@@ -169,5 +170,45 @@ describe('shared bookmark URL policy', () => {
       storedBookmarksEnvelopeSchema.safeParse(envelope([bookmarkAt(0, 'Daily', overLimit)]))
         .success,
     ).toBe(false)
+  })
+})
+
+describe('tide envelope contract', () => {
+  const tide = {
+    schemaVersion: 1,
+    data: {
+      station: { label: 'Alameda', datum: 'MLLW', units: 'feet' },
+      current: {
+        at: '2026-09-09T15:00:00.000Z',
+        heightFeet: 2.1,
+        basis: 'observed',
+        direction: 'rising',
+      },
+      nextTurn: { kind: 'high', at: '2026-09-09T17:42:00.000Z', heightFeet: 5.4 },
+      predictions: [
+        { at: '2026-09-09T07:00:00.000Z', heightFeet: 0.8 },
+        { at: '2026-09-09T17:42:00.000Z', heightFeet: 5.4 },
+      ],
+      turns: [{ kind: 'high', at: '2026-09-09T17:42:00.000Z', heightFeet: 5.4 }],
+    },
+    meta,
+  }
+
+  it('accepts finite normalized tide data without private station identifiers', () => {
+    expect(tideEnvelopeSchema.safeParse(tide).success).toBe(true)
+  })
+
+  it.each([
+    { ...tide, data: { ...tide.data, stationId: '9414290' } },
+    {
+      ...tide,
+      data: { ...tide.data, current: { ...tide.data.current, heightFeet: Number.NaN } },
+    },
+    {
+      ...tide,
+      data: { ...tide.data, predictions: [tide.data.predictions[0]] },
+    },
+  ])('rejects private, non-finite, or incomplete tide data', (candidate) => {
+    expect(tideEnvelopeSchema.safeParse(candidate).success).toBe(false)
   })
 })

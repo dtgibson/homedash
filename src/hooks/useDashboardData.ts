@@ -4,6 +4,7 @@ import {
   bookmarksEnvelopeSchema,
   ebirdEnvelopeSchema,
   llmdashEnvelopeSchema,
+  tideEnvelopeSchema,
   weatherEnvelopeSchema,
   storedBookmarksEnvelopeSchema,
   type ApiMeta,
@@ -11,6 +12,7 @@ import {
   type EbirdEnvelope,
   type LlmdashEnvelope,
   type LocationSelector,
+  type TideEnvelope,
   type WeatherEnvelope,
 } from '../shared/contracts'
 import { readEligibleLocation, readSnapshot, saveLocation, saveSnapshot } from '../lib/storage'
@@ -32,6 +34,7 @@ export interface DashboardData {
   bookmarks: WidgetState<BookmarksEnvelope>
   ebird: WidgetState<EbirdEnvelope>
   llmdash: WidgetState<LlmdashEnvelope>
+  tide: WidgetState<TideEnvelope>
 }
 
 export type WidgetName = keyof DashboardData
@@ -41,15 +44,17 @@ type SchemaByWidget = {
   bookmarks: typeof bookmarksEnvelopeSchema
   ebird: typeof ebirdEnvelopeSchema
   llmdash: typeof llmdashEnvelopeSchema
+  tide: typeof tideEnvelopeSchema
 }
 
-const widgetNames: WidgetName[] = ['weather', 'bookmarks', 'ebird', 'llmdash']
+const widgetNames: WidgetName[] = ['weather', 'bookmarks', 'ebird', 'llmdash', 'tide']
 
 const widgetLabels: Record<WidgetName, string> = {
   weather: 'Weather',
   bookmarks: 'Bookmarks',
   ebird: 'eBird',
   llmdash: 'llmdash',
+  tide: 'Tide',
 }
 
 const snapshotKeys: Record<WidgetName, string> = {
@@ -57,6 +62,7 @@ const snapshotKeys: Record<WidgetName, string> = {
   bookmarks: 'homedash.cache.bookmarks.v1',
   ebird: 'homedash.cache.ebird.v1',
   llmdash: 'homedash.cache.llmdash.v1',
+  tide: 'homedash.cache.tide.v1',
 }
 
 const schemas: SchemaByWidget = {
@@ -64,6 +70,7 @@ const schemas: SchemaByWidget = {
   bookmarks: bookmarksEnvelopeSchema,
   ebird: ebirdEnvelopeSchema,
   llmdash: llmdashEnvelopeSchema,
+  tide: tideEnvelopeSchema,
 }
 
 function staleCopy<T extends { meta: ApiMeta }>(value: T, failureMessage?: string): T {
@@ -108,6 +115,7 @@ function hydrateDashboardData(): DashboardData {
     bookmarks: hydratedWidget('bookmarks'),
     ebird: hydratedWidget('ebird'),
     llmdash: hydratedWidget('llmdash'),
+    tide: hydratedWidget('tide'),
   }
 }
 
@@ -299,6 +307,20 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
     [loadLocationWidget],
   )
 
+  const loadTide = useCallback(
+    async (force: boolean) => {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      await load(
+        'tide',
+        '/api/tide',
+        tideEnvelopeSchema,
+        { method: 'POST', body: JSON.stringify({ timeZone }) },
+        force,
+      )
+    },
+    [load],
+  )
+
   const chooseLocation = useCallback(async () => {
     setLocating(true)
     setLocationMessage('Requesting this device’s location…')
@@ -341,15 +363,16 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
     beginSources(widgetNames)
     onAnnouncement?.(
       widgetNames.some((name) => dataRef.current[name].status === 'ready')
-        ? 'Showing saved readings while four sources refresh.'
-        : 'Refreshing all four dashboard sources.',
+        ? 'Showing saved readings while five sources refresh.'
+        : 'Refreshing all five dashboard sources.',
     )
     await Promise.allSettled([
       selector ? loadLocationSources(selector, true) : chooseLocation(),
       load('bookmarks', '/api/bookmarks', bookmarksEnvelopeSchema, {}, true),
       load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, true),
+      loadTide(true),
     ])
-  }, [beginSources, chooseLocation, load, loadLocationSources, onAnnouncement, selector])
+  }, [beginSources, chooseLocation, load, loadLocationSources, loadTide, onAnnouncement, selector])
 
   const retryWidget = useCallback(
     async (name: WidgetName) => {
@@ -362,9 +385,13 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
         await load('bookmarks', '/api/bookmarks', bookmarksEnvelopeSchema, {}, true)
         return
       }
-      await load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, true)
+      if (name === 'llmdash') {
+        await load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, true)
+        return
+      }
+      await loadTide(true)
     },
-    [load, loadLocationWidget, onAnnouncement, selector],
+    [load, loadLocationWidget, loadTide, onAnnouncement, selector],
   )
 
   const acceptSavedBookmarks = useCallback(
@@ -387,12 +414,13 @@ export function useDashboardData(onAnnouncement?: (message: string) => void) {
     if (started.current) return
     started.current = true
     if (initialCachedCount) {
-      onAnnouncement?.('Showing saved readings while four sources refresh.')
+      onAnnouncement?.('Showing saved readings while five sources refresh.')
     }
     void load('bookmarks', '/api/bookmarks', bookmarksEnvelopeSchema, {}, false)
     void load('llmdash', '/api/llmdash/summary', llmdashEnvelopeSchema, {}, false)
+    void loadTide(false)
     void chooseLocation()
-  }, [chooseLocation, initialCachedCount, load, onAnnouncement])
+  }, [chooseLocation, initialCachedCount, load, loadTide, onAnnouncement])
 
   const visibleSourceCount = widgetNames.filter((name) => data[name].status === 'ready').length
 

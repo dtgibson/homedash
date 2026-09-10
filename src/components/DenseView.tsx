@@ -5,6 +5,7 @@ import type { TargetCategory } from './Targets'
 import { BookmarkGroups } from './Bookmarks'
 import { DenseProvider } from './Quota'
 import { TargetList, TargetTabs } from './Targets'
+import { DenseTide } from './Tide'
 import { DenseDaylight, DenseWeather } from './Weather'
 import { ErrorState, LoadingState, SourceFreshness } from './WidgetState'
 
@@ -40,8 +41,8 @@ export function DenseView({ data, moonPhase, category, onCategory, onRetry }: De
             }).format(now)}
           </span>
         </div>
-        <span className="state-badge" data-state={visibleSources === 4 ? 'fresh' : 'partial'}>
-          {visibleSources} of 4 sources visible
+        <span className="state-badge" data-state={visibleSources === 5 ? 'fresh' : 'partial'}>
+          {visibleSources} of 5 sources visible
         </span>
       </header>
 
@@ -73,6 +74,7 @@ export function DenseView({ data, moonPhase, category, onCategory, onRetry }: De
             )}
             {weather && <DenseWeather envelope={weather} />}
             <DenseDaylight envelope={weather} moonPhase={moonPhase} />
+            <DenseTide state={data.tide} onRetry={() => onRetry('tide')} />
           </div>
         </section>
 

@@ -139,6 +139,44 @@ test.beforeEach(async ({ context, page }) => {
     } else if (/^\/api\/bookmarks\/[^/]+\/favicon$/.test(path)) {
       await route.fulfill({ status: 404, headers: { 'cache-control': 'private, max-age=900' } })
       return
+    } else if (path === '/api/tide') {
+      body = {
+        schemaVersion: 1,
+        data: {
+          station: { label: 'Alameda', datum: 'MLLW', units: 'feet' },
+          current: {
+            at: now,
+            heightFeet: 2.1,
+            basis: 'observed',
+            direction: 'rising',
+          },
+          nextTurn: {
+            kind: 'high',
+            at: new Date(Date.parse(now) + 3 * 3_600_000).toISOString(),
+            heightFeet: 5.4,
+          },
+          predictions: [
+            { at: new Date(Date.parse(now) - 8 * 3_600_000).toISOString(), heightFeet: 0.6 },
+            { at: new Date(Date.parse(now) - 3 * 3_600_000).toISOString(), heightFeet: 1.1 },
+            { at: now, heightFeet: 2.1 },
+            { at: new Date(Date.parse(now) + 3 * 3_600_000).toISOString(), heightFeet: 5.4 },
+            { at: new Date(Date.parse(now) + 8 * 3_600_000).toISOString(), heightFeet: 1.0 },
+          ],
+          turns: [
+            {
+              kind: 'low',
+              at: new Date(Date.parse(now) - 3 * 3_600_000).toISOString(),
+              heightFeet: 1.1,
+            },
+            {
+              kind: 'high',
+              at: new Date(Date.parse(now) + 3 * 3_600_000).toISOString(),
+              heightFeet: 5.4,
+            },
+          ],
+        },
+        meta: { ...meta, staleAfterMs: 900_000 },
+      }
     } else if (path === '/api/weather') {
       body = {
         schemaVersion: 1,
@@ -345,6 +383,12 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   await expect(page.getByRole('heading', { name: 'Birding pulse' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Coding runway' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Places to go' })).toBeVisible()
+  await expect(page.locator('.coastal-graphic')).toHaveAccessibleName(
+    /Current tide 2\.1 ft observed, rising\. Next high 5\.4 ft/i,
+  )
+  await expect(page.locator('.tide-current-point')).toBeVisible()
+  await expect(page.locator('.tide-turn-point')).toBeVisible()
+  await expect(page.locator('.coastal-graphic .tide-facts-full')).toContainText('Alameda · MLLW')
   const kagiQuery = page.getByRole('searchbox', { name: 'Kagi' })
   await expect(kagiQuery).toBeFocused()
   const kagiFocusTreatment = await kagiQuery.evaluate((input) => {
@@ -375,7 +419,7 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
 
   const mastheadIsContained = await page.evaluate(() => {
     const lede = document.querySelector('.lede')?.getBoundingClientRect()
-    const daylight = document.querySelector('.sun-arc')?.getBoundingClientRect()
+    const daylight = document.querySelector('.coastal-day')?.getBoundingClientRect()
     return Boolean(lede && daylight && lede.right <= daylight.left + 0.5)
   })
   expect(mastheadIsContained).toBe(true)
@@ -432,6 +476,10 @@ test('Dawn and Dense show the same sources and persist device preferences', asyn
   await settings.getByRole('radio', { name: 'Dense', exact: true }).click()
   await closeSettings(page)
   await expect(page.getByRole('heading', { name: 'Weather' })).toBeVisible()
+  await expect(page.locator('.dense-tide-line')).toHaveAccessibleName(
+    /Tide 2\.1 ft observed, rising\. Next high 5\.4 ft/i,
+  )
+  await expect(page.locator('.dense-tide-trace')).toBeVisible()
   for (const name of [...targetNames, ...bookmarkNames]) {
     await expect(page.locator('main')).toContainText(name)
   }
@@ -553,9 +601,13 @@ test('Settings stages and confirms bookmark changes in a contained modal', async
     const path = new URL(request.url()).pathname
     if (
       watchSources &&
-      ['/api/weather', '/api/bookmarks', '/api/ebird/summary', '/api/llmdash/summary'].includes(
-        path,
-      )
+      [
+        '/api/weather',
+        '/api/tide',
+        '/api/bookmarks',
+        '/api/ebird/summary',
+        '/api/llmdash/summary',
+      ].includes(path)
     ) {
       refreshedSources.push(path)
     }
@@ -666,6 +718,7 @@ test('saved readings paint before independent refreshes settle and survive a fai
     bookmarks: requestGate(),
     ebird: requestGate(),
     llmdash: requestGate(),
+    tide: requestGate(),
   }
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname
@@ -683,6 +736,7 @@ test('saved readings paint before independent refreshes settle and survive a fai
       })
       return
     }
+    if (path === '/api/tide') await gates.tide.promise
     if (path === '/api/weather') await gates.weather.promise
     if (path === '/api/ebird/summary') await gates.ebird.promise
     await route.fallback()
@@ -694,17 +748,26 @@ test('saved readings paint before independent refreshes settle and survive a fai
   await expect(page.getByText('American Redstart')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Gmail' })).toBeVisible()
   await expect(page.getByText('68%').first()).toBeVisible()
+  await expect(page.locator('.coastal-graphic .tide-facts-full')).toContainText('2.1 ft')
   await expect(
     page.getByRole('button', {
-      name: 'Refreshing 0 of 4 sources; saved readings remain visible',
+      name: 'Refreshing 0 of 5 sources; saved readings remain visible',
     }),
   ).toBeDisabled()
-  await expect(page.getByRole('status', { name: /Refreshing/ })).toHaveCount(4)
+  await expect(page.getByRole('status', { name: /Refreshing/ })).toHaveCount(5)
+
+  gates.tide.release()
+  await expect(
+    page.getByRole('button', {
+      name: 'Refreshing 1 of 5 sources; saved readings remain visible',
+    }),
+  ).toBeDisabled()
+  await expect(page.locator('.coastal-graphic .tide-facts-full')).toContainText('2.1 ft observed')
 
   gates.bookmarks.release()
   await expect(
     page.getByRole('button', {
-      name: 'Refreshing 1 of 4 sources; saved readings remain visible',
+      name: 'Refreshing 2 of 5 sources; saved readings remain visible',
     }),
   ).toBeDisabled()
   await expect(page.getByRole('link', { name: 'Gmail' })).toBeVisible()
@@ -725,6 +788,10 @@ test('saved readings paint before independent refreshes settle and survive a fai
   }
 
   await selectMode(page, 'Dense')
+  await expect(page.locator('.dense-tide-line')).toHaveAccessibleName(
+    /Tide 2\.1 ft observed, rising\. Next high 5\.4 ft/i,
+  )
+  await expect(page.locator('.dense-tide-trace')).toBeVisible()
   await expect(page.getByText('58°').first()).toBeVisible()
   await expect(page.getByRole('status', { name: /Refreshing/ })).toHaveCount(2)
   await expect(page.getByRole('status', { name: /Refresh failed/ })).toBeVisible()
@@ -732,7 +799,7 @@ test('saved readings paint before independent refreshes settle and survive a fai
   gates.weather.release()
   gates.ebird.release()
   await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
-  await expect(page.getByRole('status', { name: /Up to date/ })).toHaveCount(3)
+  await expect(page.getByRole('status', { name: /Up to date/ })).toHaveCount(4)
   await expect(page.getByRole('status', { name: /Refresh failed/ })).toHaveCount(1)
 })
 
@@ -807,7 +874,7 @@ test('global refresh keeps focus and ignores duplicate pointer and keyboard acti
 }) => {
   await page.goto('/')
   const idleRefresh = page.getByRole('button', {
-    name: 'Refresh weather, bookmarks, eBird, and llmdash data',
+    name: 'Refresh weather, tide, bookmarks, eBird, and llmdash data',
   })
   await expect(idleRefresh).toBeEnabled()
 
@@ -823,14 +890,20 @@ test('global refresh keeps focus and ignores duplicate pointer and keyboard acti
 
   await idleRefresh.click()
   const busyRefresh = page.getByRole('button', {
-    name: 'Refreshing 0 of 4 sources; saved readings remain visible',
+    name: 'Refreshing 0 of 5 sources; saved readings remain visible',
   })
   await expect(busyRefresh).toBeFocused()
   await expect(busyRefresh).toHaveAttribute('aria-busy', 'true')
   await expect(busyRefresh).toHaveAttribute('aria-disabled', 'true')
   await expect
     .poll(() => refreshRequests.sort())
-    .toEqual(['/api/bookmarks', '/api/ebird/summary', '/api/llmdash/summary', '/api/weather'])
+    .toEqual([
+      '/api/bookmarks',
+      '/api/ebird/summary',
+      '/api/llmdash/summary',
+      '/api/tide',
+      '/api/weather',
+    ])
 
   const bounds = await busyRefresh.boundingBox()
   expect(bounds).not.toBeNull()
@@ -842,7 +915,7 @@ test('global refresh keeps focus and ignores duplicate pointer and keyboard acti
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       }),
   )
-  expect(refreshRequests).toHaveLength(4)
+  expect(refreshRequests).toHaveLength(5)
   await expect(busyRefresh).toBeFocused()
 
   gate.release()
@@ -1290,18 +1363,22 @@ test('moon phase is shared across the release viewport, mode, and appearance mat
     '/api/bookmarks',
     '/api/ebird/summary',
     '/api/llmdash/summary',
+    '/api/tide',
     '/api/weather',
   ])
 
   const requestCount = apiRequests.length
   await page
-    .getByRole('button', { name: 'Refresh weather, bookmarks, eBird, and llmdash data' })
+    .getByRole('button', {
+      name: 'Refresh weather, tide, bookmarks, eBird, and llmdash data',
+    })
     .click()
   await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
   expect(apiRequests.slice(requestCount).sort()).toEqual([
     '/api/bookmarks',
     '/api/ebird/summary',
     '/api/llmdash/summary',
+    '/api/tide',
     '/api/weather',
   ])
   await expect(page.getByText('Waxing gibbous', { exact: true })).toBeVisible()
@@ -1336,7 +1413,7 @@ test('moon phase survives first-load and unavailable weather without becoming a 
   await expect(page.getByText('No weather.')).toBeVisible()
   await expect(page.getByText('Full moon', { exact: true })).toBeVisible()
   await expect(page.locator('.dense-phase')).not.toHaveAttribute('aria-busy')
-  await expect(page.getByText(/of 4 sources/)).toBeVisible()
+  await expect(page.getByText(/of 5 sources/)).toBeVisible()
 
   await selectMode(page, 'Dawn')
   await expect(page.getByText('Weather could not be reached.')).toBeVisible()
@@ -1360,5 +1437,5 @@ test('invalid device time omits lunar output while solar and weather content rem
   await expect(page.locator('.moon-phase, .dense-phase')).toHaveCount(0)
   await expect(page.getByText('58°').first()).toBeVisible()
   await expect(page.getByText(/daylight 12h 49m/)).toBeVisible()
-  await expect(page.getByText(/of 4 sources/)).toBeVisible()
+  await expect(page.getByText(/of 5 sources/)).toBeVisible()
 })

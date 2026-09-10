@@ -151,6 +151,8 @@ HOMEDASH_ALLOWED_ORIGINS=$DEFAULT_ALLOWED_ORIGINS
 SNOWRAVEN_URL=${SNOWRAVEN_URL:-http://127.0.0.1:1620}
 LLMDASH_URL=${LLMDASH_URL:-http://127.0.0.1:8787}
 LLMDASH_LAUNCH_URL=${LLMDASH_LAUNCH_URL:-}
+TIDE_STATION_ID=${TIDE_STATION_ID:-}
+TIDE_STATION_LABEL=${TIDE_STATION_LABEL:-Local tide}
 
 HOME_LATITUDE=
 HOME_LONGITUDE=
@@ -168,6 +170,13 @@ else
   if ! grep -Eq '^[[:space:]]*HOMEDASH_ALLOWED_ORIGINS=' .env; then
     printf '\nHOMEDASH_ALLOWED_ORIGINS=%s\n' "$DEFAULT_ALLOWED_ORIGINS" >>.env
     printf 'Added exact loopback and installed Tailscale origins to private configuration.\n'
+  fi
+  if ! grep -Eq '^[[:space:]]*TIDE_STATION_ID=' .env; then
+    printf '\nTIDE_STATION_ID=\n' >>.env
+    printf 'Added an optional private tide-station placeholder.\n'
+  fi
+  if ! grep -Eq '^[[:space:]]*TIDE_STATION_LABEL=' .env; then
+    printf 'TIDE_STATION_LABEL=Local tide\n' >>.env
   fi
 fi
 

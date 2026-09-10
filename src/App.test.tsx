@@ -7,7 +7,7 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
   const meta = {
     generatedAt: now,
     sourceUpdatedAt: now,
-    freshness: 'fresh' as 'fresh' | 'stale',
+    freshness: 'fresh' as 'fresh' | 'partial' | 'stale',
     staleAfterMs: 60_000,
     issues: [],
   }
@@ -143,11 +143,44 @@ const { dashboard, moonPhase } = vi.hoisted(() => {
             meta,
           },
         },
+        tide: {
+          status: 'ready' as const,
+          message: null as string | null,
+          refreshStatus: 'idle' as 'idle' | 'refreshing' | 'failed',
+          data: {
+            schemaVersion: 1 as const,
+            data: {
+              station: { label: 'Alameda', datum: 'MLLW' as const, units: 'feet' as const },
+              current: {
+                at: now,
+                heightFeet: 2.1,
+                basis: 'observed' as const,
+                direction: 'rising' as const,
+              },
+              nextTurn: {
+                kind: 'high' as const,
+                at: '2026-09-08T10:42:00.000Z',
+                heightFeet: 5.4,
+              },
+              predictions: [
+                { at: '2026-09-08T00:00:00.000Z', heightFeet: 0.5 },
+                { at: now, heightFeet: 2.1 },
+                { at: '2026-09-08T10:42:00.000Z', heightFeet: 5.4 },
+                { at: '2026-09-09T00:00:00.000Z', heightFeet: 1.2 },
+              ],
+              turns: [
+                { kind: 'low' as const, at: '2026-09-08T03:00:00.000Z', heightFeet: 0.5 },
+                { kind: 'high' as const, at: '2026-09-08T10:42:00.000Z', heightFeet: 5.4 },
+              ],
+            },
+            meta,
+          },
+        },
       },
       selector: { kind: 'current' as const, latitude: 37, longitude: -122, capturedAt: now },
       isRefreshing: false,
-      refreshProgress: 4,
-      visibleSourceCount: 4,
+      refreshProgress: 5,
+      visibleSourceCount: 5,
       isLocating: false,
       locationMessage: 'Using this device’s current location.',
       retryLocation: vi.fn(async () => undefined),
@@ -168,8 +201,8 @@ beforeEach(() => {
   localStorage.clear()
   document.documentElement.dataset.appearance = ''
   dashboard.isRefreshing = false
-  dashboard.refreshProgress = 4
-  dashboard.visibleSourceCount = 4
+  dashboard.refreshProgress = 5
+  dashboard.visibleSourceCount = 5
   moonPhase.label = 'Waxing gibbous'
   Object.values(dashboard.data).forEach((widget) => {
     widget.refreshStatus = 'idle'
@@ -382,9 +415,9 @@ describe('one store with two renderers', () => {
 
     expect(
       screen.getByRole('button', {
-        name: 'Refreshing 2 of 4 sources; saved readings remain visible',
+        name: 'Refreshing 2 of 5 sources; saved readings remain visible',
       }),
-    ).toHaveTextContent('Refreshing 2/4')
+    ).toHaveTextContent('Refreshing 2/5')
     expect(screen.getAllByRole('status', { name: /Refreshing/ })).toHaveLength(2)
 
     await openSettings(user)
@@ -426,7 +459,9 @@ describe('one store with two renderers', () => {
     render(<App />)
 
     await user.click(
-      screen.getByRole('button', { name: 'Refresh weather, bookmarks, eBird, and llmdash data' }),
+      screen.getByRole('button', {
+        name: 'Refresh weather, tide, bookmarks, eBird, and llmdash data',
+      }),
     )
     await waitFor(() => expect(dashboard.refreshAll).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(moonPhase.reevaluate).toHaveBeenCalledTimes(1))

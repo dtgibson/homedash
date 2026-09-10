@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -90,5 +90,22 @@ describe('installer bookmark path policy', () => {
     const result = validate(bookmarksFile)
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('without unrelated files')
+  })
+})
+
+describe('installer private tide configuration', () => {
+  it('creates optional placeholders and adds only missing tide keys on update', async () => {
+    const installer = await readFile(
+      path.join(process.cwd(), 'scripts', 'install-or-update.sh'),
+      'utf8',
+    )
+    const bootstrap = await readFile(path.join(process.cwd(), 'scripts', 'bootstrap.sh'), 'utf8')
+
+    expect(installer).toContain('TIDE_STATION_ID=${TIDE_STATION_ID:-}')
+    expect(installer).toContain('TIDE_STATION_LABEL=${TIDE_STATION_LABEL:-Local tide}')
+    expect(installer).toContain("grep -Eq '^[[:space:]]*TIDE_STATION_ID=' .env")
+    expect(installer).toContain("grep -Eq '^[[:space:]]*TIDE_STATION_LABEL=' .env")
+    expect(bootstrap).toContain('TIDE_STATION_ID="${TIDE_STATION_ID:-}"')
+    expect(bootstrap).toContain('TIDE_STATION_LABEL="${TIDE_STATION_LABEL:-Local tide}"')
   })
 })
