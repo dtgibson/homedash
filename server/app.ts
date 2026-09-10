@@ -260,6 +260,10 @@ export async function buildApp(options: BuildAppOptions) {
   const llmdash = new LlmdashService(options.config, options.fetchImpl)
   const tide = new TideService(options.config, options.fetchImpl)
 
+  app.addHook('onClose', async () => {
+    await favicons.close()
+  })
+
   app.setErrorHandler((error, request, reply) => {
     if (isBookmarkDocumentNamespace(request.raw.url)) {
       const code =

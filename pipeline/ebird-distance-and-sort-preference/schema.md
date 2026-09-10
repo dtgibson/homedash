@@ -195,4 +195,3 @@ Rollback is additive: remove the order control and preference field, read the re
 4. **One local preference owns both renderers.** This extends the existing device-owned presentation model and prevents category or view changes from changing the chosen meaning.
 5. **The radius migration is surgical.** Standard installs should receive the requested ten-mile area, but a non-default host value is a deliberate private decision and remains untouched.
 6. **No source boundary changes.** SnowRaven remains authoritative, resolved coordinates remain server-side, and one upstream nearby request supplies both local presentations.
-

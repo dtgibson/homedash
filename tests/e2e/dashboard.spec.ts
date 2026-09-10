@@ -1084,7 +1084,7 @@ test('named mobile controls and bookmarks keep their touch baselines', async ({
       const rectangle = element.getBoundingClientRect()
       return { width: rectangle.width, height: rectangle.height }
     })
-    expect(bounds.width, `${name} width`).toBeGreaterThanOrEqual(48)
+    expect(bounds.width, `${name} width`).toBeGreaterThanOrEqual(60)
     expect(bounds.height, `${name} height`).toBeGreaterThanOrEqual(48)
   }
 
@@ -1138,6 +1138,7 @@ test('favicons stay decorative, same-origin, stable, and inside the release view
   await expect(page.getByRole('button', { name: /Refresh weather/ })).toBeEnabled()
   await expect(page.locator('.bookmark-favicon[data-loaded="true"]')).toHaveCount(2)
   await expect(page.locator('.bookmark-fallback')).toHaveCount(3)
+  await expect(page.locator('.bookmark-fallback')).toHaveText(['CA', 'EB', 'ML'])
 
   for (const name of bookmarkNames) {
     const link = page.getByRole('link', { name, exact: true })
@@ -1202,7 +1203,7 @@ test('favicons stay decorative, same-origin, stable, and inside the release view
                 scrollHeight: element.scrollHeight,
               })),
             undersized: mobile
-              ? rectangles.filter((rectangle) => rectangle.width < 48 || rectangle.height < 48)
+              ? rectangles.filter((rectangle) => rectangle.width < 60 || rectangle.height < 48)
                   .length
               : 0,
             outsideViewport: rectangles.filter(
@@ -1231,6 +1232,26 @@ test('favicons stay decorative, same-origin, stable, and inside the release view
   }
 
   if (testInfo.project.name === 'mobile-chromium') {
+    await page.getByRole('button', { name: /Refresh weather/ }).click()
+    const notice = page.locator('.status-line.is-visible')
+    await expect(notice).toBeVisible()
+    expect(
+      await page.evaluate(() => {
+        const status = document.querySelector<HTMLElement>('.status-line.is-visible')!
+        const noticeBounds = status.getBoundingClientRect()
+        return [...document.querySelectorAll<HTMLElement>('a, button, input')]
+          .filter((element) => {
+            const bounds = element.getBoundingClientRect()
+            return (
+              Math.min(bounds.right, noticeBounds.right) >
+                Math.max(bounds.left, noticeBounds.left) &&
+              Math.min(bounds.bottom, noticeBounds.bottom) > Math.max(bounds.top, noticeBounds.top)
+            )
+          })
+          .map((element) => element.getAttribute('aria-label') || element.textContent?.trim())
+      }),
+    ).toEqual([])
+
     const link = page.getByRole('link', { name: 'GitHub', exact: true })
     const before = await page.evaluate(() => ({
       documentTop: document.documentElement.scrollTop,

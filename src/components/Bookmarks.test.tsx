@@ -28,6 +28,20 @@ const bookmarks: Bookmark[] = [
 ]
 
 describe('BookmarkGroups', () => {
+  it.each([
+    ['Gmail', 'GM'],
+    ['GitHub', 'GH'],
+    ['eBird', 'EB'],
+    ['Macaulay Library', 'ML'],
+    ['aß', 'AS'],
+    ['  ', 'BM'],
+  ])('derives the decorative fallback label for %j', (name, expected) => {
+    const { container } = render(
+      <BookmarkGroups bookmarks={[{ ...bookmarks[0]!, name }]} sections={['Daily']} />,
+    )
+    expect(container.querySelector('.bookmark-fallback')).toHaveTextContent(expected)
+  })
+
   it('preserves host group and file order with native same-tab destinations', () => {
     const { container, rerender } = render(
       <BookmarkGroups bookmarks={bookmarks} sections={['Daily', 'Projects']} />,
@@ -43,11 +57,9 @@ describe('BookmarkGroups', () => {
     expect(container.querySelectorAll('nav').length).toBe(2)
 
     rerender(<BookmarkGroups dense bookmarks={bookmarks} sections={['Daily', 'Projects']} />)
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Gmail — personal inbox',
-      'Calendar',
-      'GitHub',
-    ])
+    expect(
+      screen.getAllByRole('link').map((link) => link.querySelector('.bookmark-name')?.textContent),
+    ).toEqual(['Gmail — personal inbox', 'Calendar', 'GitHub'])
   })
 
   it('keeps the complete bookmark name as the only accessible link name', () => {
@@ -69,7 +81,7 @@ describe('BookmarkGroups', () => {
     const image = container.querySelector<HTMLImageElement>('.bookmark-favicon')!
     expect(image.getAttribute('src')).toBe('/api/bookmarks/0123456789abcdef/favicon')
     expect(image).toHaveAttribute('data-loaded', 'false')
-    expect(container.querySelector('.bookmark-fallback')).toBeInTheDocument()
+    expect(container.querySelector('.bookmark-fallback')).toHaveTextContent('GP')
 
     fireEvent.load(image)
     expect(image).toHaveAttribute('data-loaded', 'true')
@@ -77,7 +89,7 @@ describe('BookmarkGroups', () => {
 
     fireEvent.error(image)
     expect(container.querySelector('.bookmark-favicon')).not.toBeInTheDocument()
-    expect(container.querySelector('.bookmark-fallback')).toBeInTheDocument()
+    expect(container.querySelector('.bookmark-fallback')).toHaveTextContent('GP')
     expect(screen.getByRole('link', { name: 'Gmail — personal inbox' })).toHaveAttribute(
       'href',
       bookmarks[0]!.url,

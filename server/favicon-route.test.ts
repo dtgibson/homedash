@@ -113,6 +113,41 @@ describe('favicon HTTP resource', () => {
     expect(response.body).not.toContain('browser-secret')
   })
 
+  it('serves a signature-normalized image reached through one HTTPS icon host', async () => {
+    const bytes = png()
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { location: 'https://static.cdn.example/current/site.ico' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(bytes, {
+          status: 200,
+          headers: { 'content-type': 'image/vnd.microsoft.icon' },
+        }),
+      )
+    const { app, id } = await fixture(fetchMock as typeof fetch)
+
+    const response = await app.inject({ method: 'GET', url: `/api/bookmarks/${id}/favicon` })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['content-type']).toBe('image/png')
+    expect(response.rawPayload).toEqual(bytes)
+    expect(fetchMock.mock.calls.map(([input]) => input.toString())).toEqual([
+      'https://icons.example/favicon.ico',
+      'https://static.cdn.example/current/site.ico',
+    ])
+    expect(fetchMock.mock.calls[1]![1]).toMatchObject({
+      credentials: 'omit',
+      redirect: 'manual',
+      referrerPolicy: 'no-referrer',
+    })
+    expect(fetchMock.mock.calls[1]![1]).toHaveProperty('dispatcher')
+  })
+
   it.each(['HEAD', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'] as const)(
     'returns an empty no-store 404 for %s without an upstream request',
     async (method) => {

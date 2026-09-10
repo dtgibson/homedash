@@ -46,4 +46,3 @@ The owner scans Homedash to decide where to go, but a broad target radius adds n
 - The choice is shared across target categories and renderers because both presentations are views over one authoritative dashboard state.
 - The server applies the requested validated order before the five-item cap so recency can surface a qualifying target that is not among the five closest.
 - The radius change preserves private server ownership and migrates only the prior managed default; a deliberate host customization remains authoritative.
-

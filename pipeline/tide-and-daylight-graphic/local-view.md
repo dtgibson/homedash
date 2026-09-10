@@ -23,4 +23,3 @@
 8. Use the main refresh control. Its accessible progress should include five sources, and the tide facts should remain visible while tide refreshes. If tide alone fails, use its **Try again** control; the other dashboard sources should not restart.
 
 9. To inspect the unavailable state, stop the server, clear `TIDE_STATION_ID` in `.env`, and run `npm run dev` again. Daylight, moon, weather, bookmarks, eBird, and llmdash should remain available while the tide area reports that tide is unavailable.
-

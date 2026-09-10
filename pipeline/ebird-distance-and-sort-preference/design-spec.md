@@ -60,4 +60,3 @@ The selected order is a browser preference, not source freshness. A saved ready/
 - Use `Top nearby targets · within 10 mi` in Dawn and `within 10 mi` in Dense.
 - Announcements say `targets selected`, avoiding an implication that a new eBird fetch occurred.
 - Keep distance and observation age visible in every row so users can understand either order rather than trusting the selected label alone.
-

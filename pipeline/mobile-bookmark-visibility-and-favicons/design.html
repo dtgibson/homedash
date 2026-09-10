@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en" data-mode="dawn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Homedash bookmark shelf refinement</title>
+    <style>
+      :root {
+        --ground: #f2eee4;
+        --surface: #f8f4ea;
+        --raised: #fffaf0;
+        --ink: #29261f;
+        --soft: #5f5a4e;
+        --faint: #817a6a;
+        --line: #cfc6b3;
+        --strong: #9f9581;
+        --gold: #a9610d;
+        --bright: #c27712;
+        --wash: rgba(169, 97, 13, 0.1);
+        --green: #2f7959;
+        --shadow: rgba(65, 48, 18, 0.15);
+        --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+        --body: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+        --mono: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html, body { min-height: 100%; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 82% -5%, rgba(169, 97, 13, .13), transparent 30%),
+          radial-gradient(circle at 4% 96%, rgba(47, 121, 89, .08), transparent 28%),
+          var(--ground);
+        font-family: var(--body);
+      }
+      button, a { font: inherit; }
+      button { color: inherit; }
+      .frame {
+        position: relative;
+        width: min(100%, 420px);
+        min-height: 800px;
+        margin: 0 auto;
+        overflow: hidden;
+        border-inline: 1px solid var(--line);
+        background: color-mix(in srgb, var(--ground) 94%, transparent);
+      }
+      .toolbar {
+        display: grid;
+        grid-template-rows: 44px 44px;
+        gap: 4px;
+        height: 100px;
+        padding: 4px;
+        border-bottom: 1px solid var(--line);
+        font-family: var(--mono);
+      }
+      .search { display: grid; grid-template-columns: auto 1fr 44px; border: 1px solid var(--gold); border-radius: 4px; }
+      .search strong { align-self: center; padding-left: 9px; color: var(--gold); font-size: 8px; letter-spacing: .08em; }
+      .search input { min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font: 11px var(--body); }
+      .search button, .controls button { border: 0; background: transparent; cursor: pointer; }
+      .search button { border-left: 1px solid var(--line); color: var(--gold); }
+      .controls { display: flex; justify-content: space-between; gap: 4px; }
+      .controls button { min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; font-size: 7px; letter-spacing: .05em; text-transform: uppercase; }
+      .controls button[aria-pressed="true"] { color: var(--gold); box-shadow: inset 0 -2px var(--bright); }
+      .dashboard { height: 700px; padding: 6px 10px 7px; }
+      .mast { height: 60px; border-bottom: 1px solid var(--strong); }
+      .eyebrow, .kicker, .fresh { margin: 0; color: var(--faint); font: 600 6px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 2px 0 0; font: 400 30px/.9 var(--display); letter-spacing: -.035em; }
+      .lede { margin: 3px 0 0; overflow: hidden; color: var(--soft); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+      .weather { height: 125px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+      h2 { margin: 0; font: 400 15px/1 var(--display); }
+      .weather-line { display: flex; align-items: end; gap: 11px; margin-top: 5px; }
+      .temperature { font: 400 56px/.78 var(--display); letter-spacing: -.06em; }
+      .weather-copy { color: var(--soft); font-size: 9px; line-height: 1.45; }
+      .bird { height: 324px; padding: 5px 0; border-bottom: 1px solid var(--strong); }
+      .bird-head, .row { display: flex; align-items: center; justify-content: space-between; }
+      .month { margin: 8px 0 4px; font: 600 10px var(--mono); color: var(--green); }
+      .tabs { display: flex; gap: 9px; margin: 5px 0; font: 7px var(--mono); }
+      .tabs span:first-child { color: var(--green); border-bottom: 2px solid var(--green); }
+      .target { min-height: 44px; padding: 5px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 62%, transparent); }
+      .target strong { font-size: 10px; }
+      .target small { display: block; margin-top: 2px; color: var(--faint); font: 6px var(--mono); }
+      .utility { display: grid; grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); height: 187px; padding-top: 4px; }
+      .runway { min-width: 0; overflow: auto; scrollbar-width: thin; }
+      .runway-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 3px; font: 6px/1.35 var(--mono); }
+      .meter { height: 3px; margin: 2px 0 4px; background: var(--line); }
+      .meter i { display: block; width: var(--fill); height: 100%; background: var(--gold); }
+      .bookmarks { min-width: 0; min-height: 0; padding-left: 9px; overflow: hidden; border-left: 1px solid var(--line); }
+      .bookmarks-head { display: flex; align-items: baseline; justify-content: space-between; }
+      .bookmarks-head span { font: 6px var(--mono); color: var(--faint); }
+      .fresh { margin: 2px 0 3px; padding-bottom: 2px; border-bottom: 1px solid var(--line); }
+      .bookmark-scroll { min-height: 0; padding: 5px; overflow: auto; scrollbar-width: thin; }
+      .bookmark-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+      .bookmark-group h3 { margin: 0; padding-bottom: 1px; color: var(--faint); font: 600 6.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+      .bookmark-shelf a {
+        display: flex;
+        min-width: 60px;
+        min-height: 48px;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 2px;
+        border-bottom: 1px solid var(--line);
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 8.5px;
+        line-height: 1.1;
+        transition: color 150ms ease, background-color 150ms ease;
+      }
+      .bookmark-shelf a:hover { color: var(--bright); background: var(--wash); }
+      .bookmark-shelf a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--bright); outline-offset: 3px; }
+      .mark { display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid var(--strong); border-radius: 4px; background: var(--surface); color: var(--soft); font: 600 6px var(--mono); letter-spacing: -.02em; }
+      .status { position: absolute; top: 106px; right: 10px; z-index: 4; max-width: 250px; padding: 9px 11px; border-left: 3px solid var(--gold); background: var(--raised); box-shadow: 0 14px 38px var(--shadow); font: 8px/1.4 var(--mono); opacity: 0; transform: translateY(-10px); pointer-events: none; transition: opacity 180ms ease-out, transform 180ms ease-out; }
+      .status.visible { opacity: 1; transform: translateY(0); }
+      [data-mode="dense"] .dashboard { font-family: var(--mono); }
+      [data-mode="dense"] h1 { font: 600 13px var(--mono); letter-spacing: 0; }
+      [data-mode="dense"] .mast { height: 42px; padding-top: 8px; }
+      [data-mode="dense"] .lede { font: 7px var(--mono); }
+      [data-mode="dense"] .weather { height: 106px; }
+      [data-mode="dense"] .bird { height: 361px; }
+      [data-mode="dense"] h2 { font: 600 8px var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+      [data-mode="dense"] .temperature { font: 600 16px var(--mono); letter-spacing: 0; }
+      [data-mode="dense"] .weather-copy { font: 7px var(--mono); }
+      [data-mode="dense"] .utility { grid-template-columns: 1fr; grid-template-rows: 82px 106px; }
+      [data-mode="dense"] .runway { border-bottom: 1px solid var(--strong); }
+      [data-mode="dense"] .bookmarks { padding: 4px 0 0; border-left: 0; }
+      [data-mode="dense"] .bookmark-groups { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+      [data-mode="dense"] .bookmark-group { display: contents; }
+      [data-mode="dense"] .bookmark-group h3 { display: none; }
+      [data-mode="dense"] .bookmark-shelf a { min-height: 58px; justify-content: center; flex-direction: column; gap: 7px; text-align: center; font: 7px/1.05 var(--mono); }
+      @media (max-width: 359px) { .bookmark-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); } .bookmark-shelf a { min-width: 58px; } }
+      @media (prefers-color-scheme: dark) {
+        :root { --ground:#1b1915; --surface:#24211b; --raised:#2a261e; --ink:#f2ead9; --soft:#b9b09e; --faint:#898171; --line:#3c372d; --strong:#625a49; --gold:#dfa044; --bright:#f1b55c; --wash:rgba(223,160,68,.11); --green:#7cbd91; --shadow:rgba(7,6,4,.42); }
+      }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <header class="toolbar">
+        <div class="search"><strong>KAGI</strong><input aria-label="Search the web" placeholder="Search the web" autofocus /><button aria-label="Search">→</button></div>
+        <div class="controls"><button id="mode" aria-pressed="false">Dense</button><button id="notice">Refresh</button><button>Settings</button></div>
+      </header>
+      <main class="dashboard">
+        <section class="mast"><p class="eyebrow">Thursday, September 10, 2026</p><h1>Good morning.</h1><p class="lede">Low clouds giving way to a clear afternoon. The water is rising.</p></section>
+        <section class="weather"><div class="row"><h2>The day ahead</h2><span class="kicker">Current device</span></div><p class="fresh">● Up to date</p><div class="weather-line"><strong class="temperature">58°</strong><span class="weather-copy">Low clouds, then clear<br />High 72° · low 56° · rain 8%</span></div></section>
+        <section class="bird"><div class="bird-head"><h2>Birding pulse</h2><span class="kicker">within 10 mi</span></div><p class="fresh">● Up to date</p><div class="month">148 species · +12 vs last year</div><div class="tabs"><span>Lifers 5</span><span>Photo 5</span><span>Audio 5</span></div><div class="target"><strong>American Redstart</strong><small>2.1 mi · Crown Memorial · 18 min ago</small></div><div class="target"><strong>Blackburnian Warbler</strong><small>3.4 mi · Crab Cove · 26 min ago</small></div><div class="target"><strong>California Thrasher</strong><small>5.8 mi · Bay Farm Island · 1 hr ago</small></div><div class="target"><strong>Baird’s Sandpiper</strong><small>7.2 mi · Elsie Roemer · 2 hr ago</small></div><div class="target"><strong>Ruff</strong><small>9.8 mi · Alameda shoreline · 3 hr ago</small></div></section>
+        <aside class="utility">
+          <section class="runway"><div class="row"><h2>Coding runway</h2><span class="kicker">llmdash ↗</span></div><p class="fresh">● Up to date</p><div class="runway-grid"><div><strong>Claude Code</strong><div class="meter"><i style="--fill:84%"></i></div>5 hour 84% · weekly 71%</div><div><strong>Codex</strong><div class="meter"><i style="--fill:96%"></i></div>5 hour 96% · weekly 92%</div></div></section>
+          <section class="bookmarks"><div class="bookmarks-head"><h2>Places to go</h2><span>5 · host order</span></div><p class="fresh">● Up to date</p><div class="bookmark-scroll"><div class="bookmark-groups bookmark-shelf"><nav class="bookmark-group" aria-label="Personal bookmarks"><h3>Personal</h3><a href="#gmail"><span class="mark" aria-hidden="true">GM</span><span>Gmail</span></a><a href="#calendar"><span class="mark" aria-hidden="true">CA</span><span>Calendar</span></a></nav><nav class="bookmark-group" aria-label="Code bookmarks"><h3>Code</h3><a href="#github"><span class="mark" aria-hidden="true">GH</span><span>GitHub</span></a></nav><nav class="bookmark-group" aria-label="Birds bookmarks"><h3>Birds</h3><a href="#ebird"><span class="mark" aria-hidden="true">EB</span><span>eBird</span></a><a href="#macaulay"><span class="mark" aria-hidden="true">ML</span><span>Macaulay Library</span></a></nav></div></div></section>
+        </aside>
+      </main>
+      <div class="status" role="status" aria-live="polite">Bookmarks updated. All refreshes finished.</div>
+    </div>
+    <script>
+      const root = document.documentElement;
+      const mode = document.querySelector('#mode');
+      const notice = document.querySelector('#notice');
+      const status = document.querySelector('.status');
+      mode.addEventListener('click', () => { const dense = root.dataset.mode !== 'dense'; root.dataset.mode = dense ? 'dense' : 'dawn'; mode.textContent = dense ? 'Dawn' : 'Dense'; mode.setAttribute('aria-pressed', String(dense)); });
+      notice.addEventListener('click', () => { status.classList.add('visible'); window.setTimeout(() => status.classList.remove('visible'), 2200); });
+    </script>
+  </body>
+</html>

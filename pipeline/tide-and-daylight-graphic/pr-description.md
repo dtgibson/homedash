@@ -23,4 +23,3 @@ The browser keeps a validated last-good tide snapshot and refreshes tide as a fi
 - A stale last-good envelope may survive a failed refresh within the approved age bound, but malformed, oversized, non-finite, duplicate, or chronologically invalid provider data never replaces it.
 - `TIDE_STATION_ID` and `TIDE_STATION_LABEL` are private environment values. The installer adds empty/default placeholders only when absent and preserves existing `.env` values.
 - The implementation adds no database, credentials, browser-to-NOAA request, new component library, or new color token. SVG graphics are supplementary; adjacent text carries the complete accessible meaning.
-
